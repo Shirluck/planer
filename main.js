@@ -5,7 +5,8 @@ const fs = require('fs');
 
 // Одинаковая папка данных и в режиме разработки, и в собранном приложении:
 //   Windows: %APPDATA%\Planer     macOS: ~/Library/Application Support/Planer     Linux: ~/.config/Planer
-app.setPath('userData', path.join(app.getPath('appData'), 'Planer'));
+// PLANER_DATA_DIR — отдельная папка данных (используется автотестами, чтобы не трогать настоящие данные).
+app.setPath('userData', process.env.PLANER_DATA_DIR ? path.resolve(process.env.PLANER_DATA_DIR) : path.join(app.getPath('appData'), 'Planer'));
 
 const isMac = process.platform === 'darwin';
 const dir = () => app.getPath('userData');

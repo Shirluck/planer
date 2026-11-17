@@ -11,16 +11,35 @@
     "dist": "electron-builder"
   },
   "devDependencies": {
-    "electron": "latest",
-    "electron-builder": "latest"
+    "@playwright/test": "1.65.1",
+    "electron": "45.3.3",
+    "electron-builder": "26.18.0",
+    "png-to-ico": "3.0.2",
+    "sharp": "0.35.5"
   },
   "build": {
     "appId": "local.planer.desktop",
     "productName": "Планер",
-    "files": ["main.js", "preload.js", "shim.js", "index.html", "package.json"],
-    "directories": { "output": "dist" },
-    "win": { "target": "nsis" },
-    "mac": { "target": "dmg", "category": "public.app-category.productivity" },
-    "linux": { "target": "AppImage", "category": "Office" }
+    "files": [
+      "main.js",
+      "preload.js",
+      "shim.js",
+      "index.html",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.productivity"
+    },
+    "linux": {
+      "target": "AppImage",
+      "category": "Office"
+    }
   }
 }
