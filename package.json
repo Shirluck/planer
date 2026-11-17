@@ -1,0 +1,26 @@
+{
+  "name": "planer-desktop",
+  "version": "1.0.0",
+  "description": "Планер: день, неделя, основные планы и идеи",
+  "author": "Planer",
+  "license": "MIT",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "latest",
+    "electron-builder": "latest"
+  },
+  "build": {
+    "appId": "local.planer.desktop",
+    "productName": "Планер",
+    "files": ["main.js", "preload.js", "shim.js", "index.html", "package.json"],
+    "directories": { "output": "dist" },
+    "win": { "target": "nsis" },
+    "mac": { "target": "dmg", "category": "public.app-category.productivity" },
+    "linux": { "target": "AppImage", "category": "Office" }
+  }
+}

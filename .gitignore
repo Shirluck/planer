@@ -1,0 +1,7 @@
+node_modules/
+dist/
+*.log
+tests/screens/*.png
+test-results/
+playwright-report/
+.tmp/
