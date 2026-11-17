@@ -134,6 +134,10 @@
           try {
             if (!tool) throw new Error('Unknown tool: ' + u.name);
             const out = await tool.execute(u.input || {});
+            if (out && Array.isArray(out.__content)) {          // готовые блоки (например, картинка для look_at_image)
+              results.push({ type: 'tool_result', tool_use_id: u.id, content: out.__content });
+              continue;
+            }
             let s = typeof out === 'string' ? out : JSON.stringify(out === undefined ? { ok: true } : out);
             if (s.length > 12000) s = s.slice(0, 12000) + '…[обрезано]';
             results.push({ type: 'tool_result', tool_use_id: u.id, content: s });

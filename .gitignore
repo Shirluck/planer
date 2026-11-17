@@ -5,3 +5,4 @@ tests/screens/*.png
 test-results/
 playwright-report/
 .tmp/
+tests/.fixtures/

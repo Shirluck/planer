@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: media:; media-src media:; font-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
 <title>Планер</title>
 <style>
 :root{
@@ -214,6 +214,7 @@ kbd{font:inherit;font-size:11.5px;background:var(--panel-2);border:1px solid var
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
+<link rel="stylesheet" href="src/board.css">
 </head>
 <body>
 <div id="app">
@@ -229,6 +230,8 @@ kbd{font:inherit;font-size:11.5px;background:var(--panel-2);border:1px solid var
 <aside class="ai" id="aiPanel" aria-label="ИИ-ассистент"></aside>
 
 <script src="shim.js"></script>
+<script src="src/sketch.js"></script>
+<script src="src/board.js"></script>
 <script>
 (function(){
 'use strict';
@@ -319,7 +322,7 @@ function defaults(k){
   const f = t => ({ id:newId(), type:'folder', title:t, open:true, children:[] });
   return { nodes: k === 'plans' ? [f('Работа'), f('Личное')] : [f('Проекты'), f('Заметки')] };
 }
-const normTask  = t => ({ id:String(t.id || newId()), text:String(t.text || ''), done:!!t.done, pri:Math.min(3, Math.max(0, t.pri | 0)), note:String(t.note || '') });
+const normTask  = t => ({ id:String(t.id || newId()), text:String(t.text || ''), done:!!t.done, pri:Math.min(3, Math.max(0, t.pri | 0)), note:String(t.note || ''), boardCount:Math.max(0, t.boardCount | 0) });
 const normBlock = b => ({ id:String(b.id || newId()), t:BLOCK_TYPES.includes(b.t) ? b.t : 'p', text:String(b.text || ''), done:!!b.done });
 function normNode(n){
   return n && n.type === 'folder'
@@ -356,6 +359,7 @@ function countNodes(nodes){ let n = 0; nodes.forEach(x => { if (x.type === 'page
 
 /* ---------- persistence ---------- */
 const backend = { kind:'memory', db:null, uid:null, refs:{} };
+let boardApi = null;   // доска задачи (src/board.js), создаётся перед запуском
 const timers = {}, writing = {}, again = {}, lastSaved = {}, pendingRemote = {};
 const dirty = new Set();
 let loaded = false;
@@ -443,7 +447,7 @@ async function flush(k){
     const json = JSON.stringify(body);
     lastSaved[k] = stable(body);
     if (backend.kind === 'db') {
-      if (new Blob([json]).size > 235000) toast('Этот раздел почти достиг лимита размера (256 КБ). Удалите лишнее или разнесите по другим разделам.');
+      if (!window.electronAPI && new Blob([json]).size > 235000) toast('Этот раздел почти достиг лимита размера (256 КБ). Удалите лишнее или разнесите по другим разделам.');
       await backend.refs[k].set(body);
     } else if (backend.kind === 'local') {
       localStorage.setItem('planner1-' + k, json);
@@ -456,9 +460,35 @@ async function flush(k){
   }
   writing[k] = false;
   if (again[k] || dirty.has(k)) { again[k] = false; clearTimeout(timers[k]); timers[k] = setTimeout(() => flush(k), 300); }
-  else if (!dirty.size && !Object.values(writing).some(Boolean)) idleStatus();
+  else if (!dirty.size && !Object.values(writing).some(Boolean) && !extraPending.size) idleStatus();
 }
 function flushAll(){ KEYS.forEach(k => { if (dirty.has(k)) { clearTimeout(timers[k]); flush(k); } }); }
+// Дописать всё несохранённое (перед закрытием окна): разделы и доски.
+async function flushEverything(){
+  if (boardApi) { try { await boardApi.flush(); } catch (e) {} }
+  flushAll();
+  for (let i = 0; i < 100 && (dirty.size || Object.values(writing).some(Boolean)); i++) { await new Promise(r => setTimeout(r, 20)); flushAll(); }
+}
+
+/* Отдельные документы (доски задач): тот же бэкенд, что и у разделов */
+const extraPending = new Set(), memDocs = {};
+const extraStore = {
+  async get(name){
+    if (backend.kind === 'db') { const s = await backend.db.collection('data/users/' + backend.uid).doc(name).get(); return s.exists ? s.data() : null; }
+    if (backend.kind === 'local') { try { const r = localStorage.getItem('planner1-' + name); return r ? JSON.parse(r) : null; } catch (e) { return null; } }
+    return memDocs[name] ? clone(memDocs[name]) : null;
+  },
+  async set(name, v){
+    if (backend.kind === 'db') return backend.db.collection('data/users/' + backend.uid).doc(name).set(v);
+    if (backend.kind === 'local') { localStorage.setItem('planner1-' + name, JSON.stringify(v)); return; }
+    memDocs[name] = clone(v);
+  }
+};
+function pendingSave(key, on){
+  if (on) { extraPending.add(key); setStatus('saving'); return; }
+  extraPending.delete(key);
+  if (!extraPending.size && !dirty.size && !Object.values(writing).some(Boolean)) idleStatus();
+}
 document.addEventListener('visibilitychange', () => { if (document.hidden) flushAll(); else refreshDates(); });
 window.addEventListener('pagehide', flushAll);
 
@@ -483,6 +513,8 @@ function openMenu(anchor, items){
   closeMenu();
   menuEl = h('div', { class:'menu', role:'menu' }, items.filter(Boolean).map(it => it.sep
     ? h('div', { class:'menu-sep' })
+    : it.swatches
+    ? h('div', { class:'bd-sw menu-sw', role:'radiogroup', 'aria-label':'Цвет' }, it.swatches.map(c => h('button', { class:'bd-sw-b', type:'button', role:'radio', 'data-color':c, 'aria-checked':String(it.value === c), 'aria-label':it.names[c], title:it.names[c], onclick:() => { closeMenu(); it.pick(c); } })))
     : h('button', { class:'menu-it' + (it.danger ? ' danger' : ''), type:'button', role:'menuitem', onclick:() => { closeMenu(); it.run(); } }, icon(it.icon || 'dot', 15), it.label)));
   document.body.append(menuEl);
   const r = anchor.getBoundingClientRect(), mw = menuEl.offsetWidth, mh = menuEl.offsetHeight;
@@ -550,6 +582,8 @@ function buildTaskCol(k){
       if (t.done && S[k].hideDone) setTimeout(() => { if (el.isConnected && t.done) refreshTasks(k); }, 450);
     } else if (e.target.closest('.pri')) {
       t.pri = (t.pri + 1) % 4; paintItem(el, t); touch(k);
+    } else if (e.target.closest('.board-btn')) {
+      if (boardApi) boardApi.open(t.id);
     } else if (e.target.closest('.note-btn') || e.target.closest('.note-prev')) {
       if (openNotes.has(t.id) && !t.note.trim()) openNotes.delete(t.id);
       else if (openNotes.has(t.id)) openNotes.delete(t.id); else openNotes.add(t.id);
@@ -594,6 +628,7 @@ function itemEl(k, t){
     h('textarea', { class:'txt', rows:'1', spellcheck:'false', 'aria-label':'Текст задачи' }),
     h('div', { class:'acts' },
       h('button', { class:'pri', type:'button' }),
+      h('button', { class:'board-btn', type:'button', 'aria-label':'Доска задачи', title:'Доска: заметки, фото, видео, зарисовки' }, icon('board', 15), h('span', { class:'bc' })),
       h('button', { class:'note-btn', type:'button', 'aria-label':'Заметка', title:'Заметка' }, icon('note', 15)),
       h('button', { class:'more', type:'button', 'aria-label':'Ещё', title:'Ещё' }, icon('more', 16))),
     h('div', { class:'note-wrap' },
@@ -615,6 +650,11 @@ function paintItem(el, t){
   el.classList.toggle('note-open', openNotes.has(t.id));
   el.classList.toggle('has-note', !!(t.note && t.note.trim()));
   el.querySelector('.note-prev').textContent = firstLine(t.note);
+  const bc = t.boardCount | 0, bb = el.querySelector('.board-btn');
+  el.classList.toggle('has-board', bc > 0);
+  bb.querySelector('.bc').textContent = bc > 0 ? String(bc) : '';
+  const bl = bc > 0 ? 'Доска задачи: ' + bc + ' ' + (bc % 10 === 1 && bc % 100 !== 11 ? 'карточка' : (bc % 10 >= 2 && bc % 10 <= 4 && (bc % 100 < 12 || bc % 100 > 14)) ? 'карточки' : 'карточек') : 'Доска задачи';
+  bb.setAttribute('aria-label', bl); bb.title = bc > 0 ? bl : 'Доска: заметки, фото, видео, зарисовки';
 }
 function updateProgress(k){
   const c = cols[k], all = S[k].items, done = all.filter(t => t.done).length;
@@ -633,6 +673,7 @@ function refreshTasks(k){
   if (!vis.length) c.list.append(h('div', { class:'empty' }, st.items.length ? 'Все дела выполнены' : SECTIONS[k].empty));
   vis.forEach(t => c.list.append(itemEl(k, t)));
   c.list.querySelectorAll('textarea').forEach(autosize);
+  if (boardApi) { const id = boardApi.openTaskId(); if (id && !findTask(id)) boardApi.close(); }
 }
 function addFromInput(k, input){
   let text = input.value.trim(); if (!text) return;
@@ -954,7 +995,7 @@ function buildAiPanel(){
     h('form', { class:'ai-form', onsubmit:e => { e.preventDefault(); if (aiBusy) { aiCtrl && aiCtrl.abort(); return; } const v = aiIn.value.trim(); if (v) { aiIn.value = ''; autosize(aiIn); aiSend(v); } } }, aiIn, aiSendBtn));
   aiIn.addEventListener('input', () => autosize(aiIn));
   aiIn.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); aiSendBtn.click(); } });
-  addMsg('bot', 'Я вижу ваши списки и могу их менять: добавлять задачи, расставлять приоритеты, переносить между «Сегодня» и «Неделя», создавать страницы в «Основных планах» и «Идеях». Просто напишите, что нужно.');
+  addMsg('bot', 'Я вижу ваши списки и могу их менять: добавлять задачи, расставлять приоритеты, переносить между «Сегодня» и «Неделя», создавать страницы в «Основных планах» и «Идеях». Могу читать доски задач и добавлять на них заметки и чек-листы, а картинки посмотрю, если попросите. Просто напишите, что нужно.');
 }
 function openAi(){ aiPanel.classList.add('open'); aiPanel.removeAttribute('inert'); setTimeout(() => aiIn.focus(), 220); }
 function closeAi(){ aiPanel.classList.remove('open'); }
@@ -966,7 +1007,7 @@ function addMsg(role, text){
 }
 function ctxTasks(k){
   const it = S[k].items; if (!it.length) return '(пусто)';
-  return it.map(t => '[' + t.id + '] ' + (t.done ? '[x]' : '[ ]') + ' ' + (t.pri ? '(приоритет ' + t.pri + ') ' : '') + t.text + (t.note.trim() ? ' — заметка: ' + t.note.replace(/\s+/g, ' ').slice(0, 200) : '')).join('\n');
+  return it.map(t => '[' + t.id + '] ' + (t.done ? '[x]' : '[ ]') + ' ' + (t.pri ? '(приоритет ' + t.pri + ') ' : '') + t.text + (t.note.trim() ? ' — заметка: ' + t.note.replace(/\s+/g, ' ').slice(0, 200) : '') + (t.boardCount ? ' {доска: карточек ' + t.boardCount + '}' : '')).join('\n');
 }
 function ctxTree(k){
   const out = [];
@@ -985,7 +1026,12 @@ function buildPrompt(userText){
     'Если пользователь просит что-то сделать, добавить, запланировать или разложить — делай это инструментами, а не только советуй. ' +
     'Если просит совет или анализ — просто ответь. Ничего не удаляй без прямой просьбы. После действий в одну-две фразы скажи, что сделано. ' +
     'Приоритет задачи: 0 — нет, 1 — низкий, 2 — средний, 3 — высокий. Идентификаторы в квадратных скобках — это id для инструментов. ' +
-    'Заметки к задаче короткие. Содержимое страниц смотри через read_page.\nСейчас: ' + now + '.\n\n<состояние>\n' +
+    'Заметки к задаче короткие. Содержимое страниц смотри через read_page.\n' +
+    'У задач в «Сегодня» и «Неделе» есть доски — холст с карточками (заметки, чек-листы, фото, видео, зарисовки, ссылки); у каких задач доска не пустая, видно по пометке {доска: …}. ' +
+    'Содержимое доски читай через read_board(taskId); добавить заметку или чек-лист на доску — add_board_card. ' +
+    'Изображения и зарисовки смотри через look_at_image(cardId) только когда пользователь прямо просит посмотреть, описать или разобрать картинку.\n' +
+    (boardApi && boardApi.openTaskId() ? 'Сейчас у пользователя открыта доска задачи [' + boardApi.openTaskId() + '].\n' : '') +
+    'Сейчас: ' + now + '.\n\n<состояние>\n' +
     '== СЕГОДНЯ ==\n' + ctxTasks('day') + '\n\n== НЕДЕЛЯ ==\n' + ctxTasks('week') + '\n\n== ОСНОВНЫЕ ПЛАНЫ (папки и страницы) ==\n' + ctxTree('plans') +
     '\n\n== ИДЕИ (папки и страницы) ==\n' + ctxTree('ideas') + '\n</состояние>\n\nЗапрос пользователя: ' + userText;
 }
@@ -993,7 +1039,8 @@ function toBlocks(arr){
   return (Array.isArray(arr) ? arr : []).slice(0, 200).map(b => newBlock(BLOCK_TYPES.includes(b && b.type) ? b.type : 'p', String((b && b.text) || '').slice(0, 2000))).map((b, i) => { b.done = !!(arr[i] && arr[i].done) && b.t === 'todo'; return b; });
 }
 function aiTools(logEl){
-  const log = (ic, text) => { logEl.append(h('div', { class:'act' }, icon(ic, 14), h('span', {}, text))); aiMsgs.scrollTop = aiMsgs.scrollHeight; };
+  const log = (ic, text, img) => { logEl.append(h('div', { class:'act' }, icon(ic, 14), h('span', {}, text, img ? h('img', { class:'act-thumb', src:img, alt:'' }) : null))); aiMsgs.scrollTop = aiMsgs.scrollHeight; };
+  const boardTask = id => { if (!boardApi) throw new Error('Boards are not available'); const loc = findTask(String(id || '')); if (!loc) throw new Error('Task not found: ' + id); return loc.t; };
   const listOk = l => { if (l !== 'day' && l !== 'week') throw new Error('list must be "day" or "week"'); return l; };
   const taskOrThrow = id => { const loc = findTask(id); if (!loc) throw new Error('Task not found: ' + id); return loc; };
   const T = (name, description, properties, required, fn) => ({ name, description, inputSchema:{ type:'object', properties, required }, execute: async i => fn(i || {}) });
@@ -1043,6 +1090,32 @@ function aiTools(logEl){
       if (bl.length === 1 && !bl[0].text) bl.length = 0;
       l.node.blocks.push(...nb); touch(l.k); refreshTree(l.k); if (editing && editing.id === i.id) editorSync();
       log('file', 'Дополнена страница: ' + (l.node.title || 'Без названия')); return { ok:true, added:nb.length };
+    }),
+    T('read_board', 'Read all cards on the board of a task from "day" or "week": notes (text), checklists (title, items), images/videos (file name, caption), sketches, links. Card ids are needed for look_at_image.', { taskId:{ type:'string' } }, ['taskId'], async i => {
+      const t = boardTask(i.taskId);
+      const cards = await boardApi.readBoard(t.id);
+      log('board', 'Прочитана доска: ' + t.text + ' (карточек: ' + cards.length + ')');
+      return { task:t.text, cards };
+    }),
+    T('add_board_card', 'Add a note or a checklist card to the board of a task. For type "checklist": if text has several lines, the first line is the title and every other line is an item ("[x] " prefix = done). x/y are optional board coordinates; without them the card is placed in free space without overlapping other cards.', { taskId:{ type:'string' }, type:{ type:'string', enum:['note', 'checklist'] }, text:{ type:'string' }, x:{ type:'number' }, y:{ type:'number' } }, ['taskId', 'type', 'text'], async i => {
+      const t = boardTask(i.taskId), text = String(i.text || '').trim(); if (!text) throw new Error('text is empty');
+      const it = await boardApi.addCard(t.id, i.type === 'checklist' ? 'checklist' : 'note', text.slice(0, 8000), i.x, i.y);
+      log('board', (it.type === 'checklist' ? 'Чек-лист' : 'Заметка') + ' добавлен' + (it.type === 'checklist' ? '' : 'а') + ' на доску «' + t.text + '»');
+      return { ok:true, id:it.id };
+    }),
+    T('look_at_image', 'Look at an image or sketch card from a task board (the picture is sent to you). Use ONLY when the user explicitly asks to look at, describe or analyze a picture. Get card ids from read_board.', { cardId:{ type:'string' } }, ['cardId'], async i => {
+      if (!boardApi) throw new Error('Boards are not available');
+      const f = await boardApi.findCard(String(i.cardId || ''));
+      if (!f) throw new Error('Card not found: ' + i.cardId);
+      const it = f.item;
+      if (it.type !== 'image' && !(it.type === 'sketch' && it.mediaId)) throw new Error('This card is not an image (type: ' + it.type + ')');
+      const img = await boardApi.imageForAI(it);
+      const label = it.type === 'sketch' ? 'зарисовка' : (it.caption || it.name || 'изображение');
+      log('eye', 'Отправляю ассистенту картинку: ' + label + ' (' + img.width + '×' + img.height + ', JPEG)', it.type === 'image' && it.thumb ? boardApi.thumbUrl(it.mediaId) : boardApi.mediaUrl(it.mediaId));
+      return { __content:[
+        { type:'image', source:{ type:'base64', media_type:img.mediaType, data:img.data } },
+        { type:'text', text:'Карточка ' + it.id + ' (' + (it.type === 'sketch' ? 'зарисовка' : 'изображение') + (it.name ? ', файл «' + it.name + '»' : '') + (it.caption ? ', подпись «' + it.caption + '»' : '') + (it.overlay ? ', поверх нарисованы пометки' : '') + ')' }
+      ] };
     })
   ];
 }
@@ -1083,6 +1156,31 @@ async function initAI(){
   aiBtn.addEventListener('click', () => aiPanel.classList.contains('open') ? closeAi() : openAi());
 }
 
+/* ---------- task boards ---------- */
+function createBoards(){
+  if (!window.PlanerBoard) return null;
+  const repaintTask = id => { const loc = findTask(id); if (!loc) return; const el = cols[loc.k] && cols[loc.k].list.querySelector('.item[data-id="' + id + '"]'); if (el) paintItem(el, loc.t); return el; };
+  return window.PlanerBoard.create({
+    h, icon, IC, toast, openMenu, closeMenu, isMenuOpen:() => !!menuEl,
+    electron:window.electronAPI || null,
+    store:extraStore, pending:pendingSave,
+    saveError:e => { setStatus('error'); showBanner('Не удалось сохранить доску: ' + ((e && (e.code || e.message)) || 'ошибка') + '. Изменения остаются на экране.'); },
+    getTask:id => { const l = findTask(id); return l ? l.t : null; },
+    taskSection:id => { const l = findTask(id); return l ? l.k : null; },
+    sectionTitle:k => SECTIONS[k] ? SECTIONS[k].title : '',
+    setTaskText(id, text){
+      const loc = findTask(id); if (!loc || loc.t.text === text) return;
+      loc.t.text = String(text).slice(0, 500); touch(loc.k);
+      const el = repaintTask(id), ta = el && el.querySelector('.txt');
+      if (ta && document.activeElement !== ta) { ta.value = loc.t.text; autosize(ta); }
+    },
+    setBoardCount(id, n){ const loc = findTask(id); if (!loc || (loc.t.boardCount | 0) === n) return; loc.t.boardCount = n; touch(loc.k); repaintTask(id); },
+    allBoardTaskIds:() => ['day', 'week'].flatMap(k => S[k].items.filter(t => t.boardCount > 0).map(t => t.id)),
+    toggleAi:() => { if (!sample) { toast('Ассистент недоступен.'); return; } aiPanel.classList.contains('open') ? closeAi() : openAi(); },
+    onClosed:id => { repaintTask(id); }
+  });
+}
+
 /* ---------- global keys & boot ---------- */
 document.addEventListener('keydown', e => {
   if (e.key !== 'Escape') return;
@@ -1091,8 +1189,14 @@ document.addEventListener('keydown', e => {
   else if (aiPanel.classList.contains('open')) closeAi();
 });
 if ('ResizeObserver' in window) new ResizeObserver(debounce(autosizeAll, 80)).observe(board);
+// Файл, случайно брошенный мимо доски, не должен открываться вместо приложения.
+['dragover', 'drop'].forEach(t => document.addEventListener(t, e => { if (e.dataTransfer && [...e.dataTransfer.types].includes('Files')) e.preventDefault(); }));
 
 (async function main(){
+  try { boardApi = createBoards(); } catch (e) { console.error('board:', e); boardApi = null; }
+  const ea = window.electronAPI;
+  if (ea && ea.onFlush) ea.onFlush(flushEverything);
+  if (ea && ea.onStoreError) ea.onStoreError(m => { setStatus('error'); showBanner(m); });
   buildBoard();
   KEYS.forEach(refreshSection);
   setStatus('loading');
@@ -1103,6 +1207,7 @@ if ('ResizeObserver' in window) new ResizeObserver(debounce(autosizeAll, 80)).ob
   board.classList.remove('loading');
   idleStatus();
   initAI();
+  if (ea && ea.notices) { try { const list = await ea.notices(); if (list && list.length) showBanner(list.join(' ')); } catch (e) {} }
 })();
 })();
 </script>
