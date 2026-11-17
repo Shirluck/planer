@@ -893,7 +893,7 @@ function create(ctx) {
   // Раскладка нескольких карточек сеткой без наложений: вокруг точки или в свободном месте.
   function layout(items, at) {
     const n = items.length, cols = Math.ceil(Math.sqrt(n));
-    const hOf = it => isMediaType(it.type) ? it.h + (it.caption ? 30 : 0) : it.type === 'link' ? 64 : it.h + 20;
+    const hOf = it => isMediaType(it.type) ? it.h + 34 : it.type === 'link' ? 64 : it.h + 20;    // у медиа — запас под подпись
     const colW = Math.max(...items.map(it => it.w));
     let y = 0;
     for (let r = 0; r * cols < n; r++) {

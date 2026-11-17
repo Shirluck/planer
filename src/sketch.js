@@ -505,13 +505,9 @@ function open(opts) {
       ta.style.color = st.color;
       stage.append(ta); positionText();
       ta.addEventListener('input', positionText);
-      ta.addEventListener('keydown', e => {
-        e.stopPropagation();
-        if (e.key === 'Escape') { e.preventDefault(); textBox = null; ta.remove(); }
-        else if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); commitText(); }
-      });
-      ta.addEventListener('blur', () => setTimeout(() => { if (textBox && textBox.ta === ta) commitText(); }, 0));
-      setTimeout(() => ta.focus(), 0);
+      ta.addEventListener('blur', () => setTimeout(() => { if (textBox && textBox.ta === ta && document.activeElement !== ta) commitText(); }, 0));
+      ta.focus({ preventScroll: true });
+      setTimeout(() => { if (textBox && textBox.ta === ta && document.activeElement !== ta) ta.focus({ preventScroll: true }); }, 0);
     }
     function positionText() {
       if (!textBox) return;
@@ -536,6 +532,12 @@ function open(opts) {
       if (closing) return;
       const mod = e.ctrlKey || e.metaKey;
       const stop = () => { e.preventDefault(); e.stopPropagation(); };
+      if (textBox && e.target === textBox.ta) {           // ввод подписи: Enter — готово, Esc — отмена
+        if (e.key === 'Escape') { stop(); const t = textBox; textBox = null; t.ta.remove(); }
+        else if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { stop(); commitText(); }
+        else if (mod && e.code === 'KeyZ') { e.stopPropagation(); }
+        return;
+      }
       if (e.key === 'Escape') { stop(); finish(true); return; }
       if (mod && e.code === 'KeyZ') { stop(); if (e.shiftKey) redo(); else undo(); return; }
       if (mod && e.code === 'KeyY') { stop(); redo(); return; }

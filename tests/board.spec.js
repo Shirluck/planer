@@ -107,12 +107,20 @@ test.describe.serial('Доска задачи', () => {
     await page.mouse.down();
     await page.mouse.move(st.x + st.width * 0.7, st.y + st.height * 0.3, { steps: 6 });
     await page.mouse.up();
+    // текстовая подпись: Enter завершает ввод, редактор остаётся открытым
+    await page.keyboard.press('t');
+    await page.mouse.click(st.x + st.width * 0.6, st.y + st.height * 0.7);
+    await page.keyboard.type('Главное');
+    await page.keyboard.press('Enter');
+    await expect(page.locator('.sk-textin')).toHaveCount(0);
+    await expect(page.locator('.sk-ov')).toBeVisible();
     await page.keyboard.press('Escape');
     const d2 = await waitBoard(page, taskId, d => d.items.some(i => i.type === 'sketch' && i.strokesId !== s1.strokesId));
     const s2 = d2.items.find(i => i.type === 'sketch');
     expect(s2.mediaId).not.toBe(s1.mediaId);
     const v2 = JSON.parse(await page.evaluate(id => window.electronAPI.media.getVector(id), s2.strokesId));
-    expect(v2.strokes.map(s => s.t)).toEqual(['pen', 'line']);
+    expect(v2.strokes.map(s => s.t)).toEqual(['pen', 'line', 'text']);
+    expect(v2.strokes[2].s).toBe('Главное');
 
     // «Отмена» в редакторе отбрасывает правки
     await page.locator('.bd-card.t-sketch').dblclick();
@@ -292,4 +300,25 @@ test.describe.serial('Доска задачи', () => {
     expect(it.overlay.mediaId).toMatch(/^[a-f0-9]{64}$/);
     await expect(card.locator('img.bd-ovl')).toHaveCount(1);
   });
+});
+
+test('видео, которое не воспроизводится: понятное сообщение и внешний плеер', async () => {
+  const dir = tmpDataDir('codec');
+  // MP4-заголовок (ftyp) с испорченным содержимым — так ведёт себя файл с неподдерживаемым кодеком
+  const bad = path.join(dir, 'hevc-clip.mp4');
+  const head = Buffer.from('000000206674797069736f6d0000020069736f6d69736f32617663316d703431', 'hex');
+  fs.writeFileSync(bad, Buffer.concat([head, Buffer.alloc(4096, 7)]));
+  const { app, page } = await launch(dir, { size: [1280, 800] });
+  try {
+    const id = await addTask(page, 'day', 'Видео');
+    await openBoard(page, id);
+    await page.setInputFiles('.bd-file', bad);
+    const card = page.locator('.bd-card.t-video');
+    await expect(card).toHaveCount(1);
+    await card.locator('.bd-play').click();
+    await expect(card.locator('.bd-vid-err')).toBeVisible();
+    await expect(card.locator('.bd-vid-err')).toContainText('не удаётся воспроизвести');
+    await expect(card.locator('.bd-vid-err button')).toHaveText('Открыть во внешнем плеере');
+    await expect(page.locator('.col')).toHaveCount(4);
+  } finally { await closeApp(app); rmDir(dir); }
 });

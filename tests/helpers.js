@@ -58,7 +58,7 @@ async function vpPoint(page, fx, fy) {
 }
 // Щелчок по видимой (не перекрытой другими карточками) точке карточки.
 async function clickCard(page, loc, opts = {}) {
-  const pt = await loc.evaluate(el => {
+  const find = () => loc.evaluate(el => {
     const r = el.getBoundingClientRect();
     for (const fy of [0.85, 0.5, 0.2]) for (const fx of [0.2, 0.5, 0.8]) {
       const x = r.left + r.width * fx, y = r.top + r.height * fy, t = document.elementFromPoint(x, y);
@@ -66,6 +66,12 @@ async function clickCard(page, loc, opts = {}) {
     }
     return null;
   });
+  let pt = await find();
+  if (!pt) {                                   // карточка за краем экрана — показать всю доску
+    await page.click('.bd-zoom .bd-zb[aria-label^="Показать всё"]');
+    await page.waitForTimeout(100);
+    pt = await find();
+  }
   if (!pt) throw new Error('card is fully covered');
   if (opts.double) await page.mouse.dblclick(pt.x, pt.y);
   else await page.mouse.click(pt.x, pt.y, { button: opts.button || 'left' });
