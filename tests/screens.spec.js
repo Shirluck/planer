@@ -153,7 +153,7 @@ test.describe.serial('Скриншоты', () => {
     // пустая доска
     await page.keyboard.press('Escape');
     const t2 = page.locator('.col[data-key=ideas] .node.page').first();
-    await t2.hover(); await t2.locator('.n-board').click();
+    await t2.locator('.n-title').dblclick();
     await shot('board-empty-light');
     await scheme('dark'); await shot('board-empty-dark'); await scheme('light');
     await page.keyboard.press('Escape');
@@ -162,7 +162,7 @@ test.describe.serial('Скриншоты', () => {
   test('плавность: 150 карточек', async () => {
     const r = await page.evaluate(async b => window.electronAPI.media.importBuffer('photo.png', 'image/png', new Uint8Array(b)), [...fs.readFileSync(fx('photo.png'))]);
     const id = r.meta.id;
-    const tid = await addPage(page, 'ideas', 'Мудборд на 150 карточек');
+    const tid = await addPage(page, 'ideas', 'Мудборд на 150 карточек', 'text');
     const items = [];
     for (let i = 0; i < 150; i++) {
       const x = (i % 15) * 280, y = Math.floor(i / 15) * 230;
@@ -171,6 +171,10 @@ test.describe.serial('Скриншоты', () => {
         : { id: 'c' + i, type: 'note', x, y, w: 240, h: 90, z: i, text: 'Карточка ' + i + '\n- пункт\n[ ] задача', color: ['', 'yellow', 'green', 'blue', 'pink', 'purple'][i % 6] });
     }
     await page.evaluate(([p, d]) => window.electronAPI.dbSet(p, d), [DOC('board-' + tid), { v: 1, items }]);
+    const row = page.locator('.node[data-id="' + tid + '"]');
+    await row.hover(); await row.locator('.n-more').click();
+    await page.click('.menu-it:has-text("Сделать доской")');
+    await expect(row).toHaveClass(/kind-board/);
     await openBoard(page, tid);
     await expect(page.locator('.bd-card')).toHaveCount(150);
     await page.waitForTimeout(500);

@@ -13,7 +13,7 @@ function tmpDataDir(tag) { return fs.mkdtempSync(path.join(os.tmpdir(), 'planer-
 function rmDir(d) { try { fs.rmSync(d, { recursive: true, force: true }); } catch (_) {} }
 
 async function launch(dataDir, opts = {}) {
-  const env = { ...process.env, PLANER_DATA_DIR: dataDir, ...(opts.env || {}) };
+  const env = { ...process.env, PLANER_DATA_DIR: dataDir, PLANER_TEST: '1', ...(opts.env || {}) };
   delete env.ELECTRON_RUN_AS_NODE;
   const app = opts.executablePath
     ? await _electron.launch({ executablePath: opts.executablePath, args: [], env })
@@ -42,22 +42,29 @@ async function addTask(page, k, text) {
   await expect(item).toBeVisible();
   return item.getAttribute('data-id');
 }
-// Новая страница в «Основных планах» или «Идеях»; редактор страницы закрывается.
-async function addPage(page, k, title) {
-  await page.locator('.col[data-key=' + k + '] .tool[aria-label="Новая страница"]').click();
-  await expect(page.locator('.sheet .title-in')).toBeFocused();
-  await page.keyboard.type(title);
-  await page.keyboard.press('Escape');
-  await expect(page.locator('.sheet .title-in')).toHaveCount(0);
+// Новый файл в «Основных планах» или «Идеях»: kind 'text' (редактор страницы) или 'board' (доска); окно закрывается.
+async function addPage(page, k, title, kind = 'board') {
+  await page.locator('.col[data-key=' + k + '] .tool[aria-label^="Новый файл"]').click();
+  await page.click('.menu-it:has-text("' + (kind === 'board' ? 'Доска' : 'Текстовый документ') + '")');
+  if (kind === 'board') {
+    await expect(page.locator('.bd-title')).toBeFocused();
+    await page.keyboard.type(title);
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.bd-sheet')).toHaveCount(0);
+  } else {
+    await expect(page.locator('.sheet .title-in')).toBeFocused();
+    await page.keyboard.type(title);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.sheet .title-in')).toHaveCount(0);
+  }
   const row = page.locator('.col[data-key=' + k + '] .node.page', { hasText: title }).last();
   await expect(row).toBeVisible();
   return row.getAttribute('data-id');
 }
-// Доска страницы: значок в строке страницы.
+// Доска открывается двойным щелчком по названию файла-доски.
 async function openBoard(page, pageId) {
-  const row = page.locator('.node[data-id="' + pageId + '"]');
-  await row.hover();
-  await row.locator('.n-board').click();
+  await page.locator('.node[data-id="' + pageId + '"] .n-title').dblclick();
   await expect(page.locator('.bd-sheet')).toBeVisible();
 }
 const isoDay = (offset = 0) => { const d = new Date(); d.setDate(d.getDate() + offset); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };

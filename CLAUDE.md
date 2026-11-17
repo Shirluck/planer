@@ -16,7 +16,7 @@
 - `src/board.css` — стили доски и редактора (только токены из `index.html`).
 - `shim.js` — `window.claude.use('db' | 'user' | 'sample')` поверх Electron; инструмент может вернуть `{ __content: [блоки] }` (картинка для модели).
 - `preload.js` — `window.electronAPI` (contextBridge); пути файлов извлекаются здесь (`webUtils.getPathForFile`), страница путей не видит.
-- `main.js` — окно, меню, IPC, ключ API, запросы к api.anthropic.com, закрытие окна только после `app:flush`.
+- `main.js` — окно, меню, трей (крестик/свернуть → трей, выход из меню трея), IPC, ключ API, запросы к api.anthropic.com, превью ссылок; перед скрытием и закрытием — `app:flush`.
 - `lib/store.js` — документы `docs/<путь с __>.json`, атомарная запись, миграция `planner-data.json` (schema 2), ежедневные копии.
 - `lib/media.js` — медиа `media/<sha256>.<ext>`, проверка сигнатур, миниатюры, векторы зарисовок, схема `media://<id>[/thumb]` с Range, сборка мусора.
 
@@ -29,7 +29,9 @@
   Перетаскивание задач — свои pointer-события (`tdrag`), цели: `.tz[data-date][data-block]` ("*" — не менять блок), `.wk-day`, `.mc-day`.
   Задачу ищет `findTask(id)` → `{date, arr, i, t}` (`date` null = «Без даты»); изменения → `touch('cal')` + `refreshCal()`.
   Старые `planner-day`/`planner-week` переносит `migrateLegacy()` (один раз, если `planner-cal` ещё нет): day → сегодня, week → undated.
-- Разделы `plans`/`ideas`: `{ nodes: [папка {id,type:'folder',title,open,children} | страница {id,type:'page',title,blocks:[{id,t,text,done}], boardCount?, boardId?}] }`.
+- Разделы `plans`/`ideas`: `{ nodes: [папка {id,type:'folder',title,open,children} | файл {id,type:'page',kind:'text'|'board',title,blocks:[…], boardCount?, boardId?}] }`.
+  `kind` определяет, что открывает двойной щелчок (`openFile`): текст — редактор страницы, доска — `openNodeBoard`. Содержимое обоих видов хранится независимо.
+  Карточка-ссылка на доске хранит превью: `ptitle, desc, site, kind, image` (mediaId), `pv` ('ok'|'fail'), `pvUrl`, `pvAt`.
 - Доска принадлежит странице: документ `board-<boardId || id страницы>` = `{ v:1, view:{x,y,zoom}, items:[{id,type,x,y,w,h,z,…}] }`;
   типы `note|checklist|image|video|sketch|link`. В board.js «taskId» — это ключ доски (см. `ownerKey`, `findOwner` в index.html).
   Медиа только ссылкой (`mediaId` = sha256), никакого base64. Зарисовка: `mediaId` (PNG) + `strokesId` (векторы); рисунок поверх фото — `overlay`.
@@ -41,7 +43,8 @@
   Удаления в интерфейсе с отменой. Медиа удаляет только сборка мусора (нет ссылок нигде, включая backups, и прошло 7 дней).
 - Безопасность: `contextIsolation: true`, `sandbox: true`, строгая CSP (добавлены только `img-src media:` и `media-src media:`),
   id медиа проверяется `^[a-f0-9]{64}$`, белый список форматов + сигнатуры, ключ API только в основном процессе.
-- Без внешних шрифтов, CDN, телеметрии и сетевых запросов (кроме ассистента). Тёмная тема через `prefers-color-scheme`.
+- Без внешних шрифтов, CDN и телеметрии. Сеть — только ассистент и превью ссылок, которые пользователь сам добавил на доску
+  (`lib/linkpreview.js`: http/https, без адресов локальной сети, лимиты времени и размера, картинка — в медиа-хранилище). Тёмная тема через `prefers-color-scheme`.
 - Клавиши проверяй по `e.code` (раскладка может быть русской). Тексты интерфейса на русском; без `alert/confirm/prompt`.
 - Electron 45: `clipboard` асинхронный (W3C-стиль, `ClipboardItem`), `writeImage` нет.
 

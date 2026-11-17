@@ -77,6 +77,6 @@ test('ассистент читает доску, смотрит картинк�
       const overlap = cl.x < r.x + r.w && r.x < cl.x + cl.w && cl.y < r.y + r.h && r.y < cl.y + 120;
       expect(overlap).toBe(false);
     }
-    await expect(page.locator('.node[data-id="' + taskId + '"] .n-board .bc')).toHaveText('3');
+    await expect(page.locator('.node[data-id="' + taskId + '"]  .n-meta')).toHaveText('3');
   } finally { await closeApp(app); rmDir(dir); }
 });

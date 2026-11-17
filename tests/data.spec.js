@@ -30,8 +30,9 @@ test('миграция старого planner-data.json без потерь и �
     await expect(page.locator('.col[data-key=plans] .node.page .n-title', { hasText: 'План' })).toBeVisible();
     // доска старой задачи → страница в «Основных планах» → «Доски задач», карточки на месте
     const pg = page.locator('.col[data-key=plans] .node.page', { hasText: 'Старая задача' });
-    await expect(pg.locator('.n-board .bc')).toHaveText('2');
-    await pg.hover(); await pg.locator('.n-board').click();
+    await expect(pg.locator('.n-meta')).toHaveText('2');
+    await expect(pg).toHaveClass(/kind-board/);
+    await pg.locator('.n-title').dblclick();
     await expect(page.locator('.bd-card')).toHaveCount(2);
     await expect(page.locator('.bd-card.t-note')).toContainText('Заметка со старой доски');
     await page.keyboard.press('Escape');

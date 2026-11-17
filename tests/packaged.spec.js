@@ -44,7 +44,7 @@ test('собранное приложение: запуск, доска, мед�
   try {
     await expect(page.locator('.col[data-key=day] .item .txt')).toHaveValue('Задача из сборки');
     await expect(page.locator('.col[data-key=week] .wk-day.today .wk-task')).toHaveText('Задача из сборки');
-    await expect(page.locator('.node[data-id="' + taskId + '"] .n-board .bc')).toHaveText('4');
+    await expect(page.locator('.node[data-id="' + taskId + '"]  .n-meta')).toHaveText('4');
     await openBoard(page, taskId);
     await page.click('.bd-zoom .bd-zb[aria-label^="Показать всё"]');
     await expect(page.locator('.bd-card')).toHaveCount(4);

@@ -106,6 +106,13 @@ function normItem(it) {
     case 'link':
       o.url = safeUrl(it.url) || ''; o.title = str(it.title, 300);
       if (!o.url && !it._draft) return null;
+      // превью: заголовок страницы, описание, сайт, картинка (media://), состояние загрузки
+      if (it.ptitle) o.ptitle = str(it.ptitle, 300);
+      if (it.desc) o.desc = str(it.desc, 600);
+      if (it.site) o.site = str(it.site, 80);
+      if (it.kind === 'video' || it.kind === 'article' || it.kind === 'image') o.kind = it.kind;
+      if (mid(it.image)) { o.image = it.image; o.imgW = num(it.imgW, 0); o.imgH = num(it.imgH, 0); o.imgThumb = !!it.imgThumb; }
+      if (it.pv === 'ok' || it.pv === 'fail') { o.pv = it.pv; o.pvUrl = str(it.pvUrl, 2000); o.pvAt = num(it.pvAt, 0); }
       break;
   }
   return o;
@@ -156,7 +163,7 @@ function toggleTodoLine(text, line) {
 function noteSummary(it) {
   if (it.type === 'note') return it.text;
   if (it.type === 'checklist') return [it.title].concat(it.items.map(x => (x.done ? '[x] ' : '[ ] ') + x.text)).filter(Boolean).join('\n');
-  if (it.type === 'link') return it.url;
+  if (it.type === 'link') return [it.title || it.ptitle, it.url].filter(Boolean).join('\n');
   if (it.type === 'image' || it.type === 'video') return it.caption || it.name;
   return it.caption || '';
 }
@@ -271,7 +278,7 @@ function create(ctx) {
     if (el && el.isConnected) return { x: it.x, y: it.y, w: el.offsetWidth || it.w, h: el.offsetHeight || it.h };
     const extra = isMediaType(it.type) && it.caption ? 30 : 0;
     const textH = it.type === 'note' ? Math.max(it.h, 24 + 21 * Math.min(40, String(it.text).split('\n').length)) :
-      it.type === 'checklist' ? Math.max(it.h, 70 + 28 * it.items.length) : it.type === 'link' ? 64 : it.h;
+      it.type === 'checklist' ? Math.max(it.h, 70 + 28 * it.items.length) : it.type === 'link' ? linkHeight(it) : it.h;
     return { x: it.x, y: it.y, w: it.w, h: textH + extra };
   }
   function bbox(items) {
@@ -510,6 +517,7 @@ function create(ctx) {
       if (!el) { el = buildCard(it); B.els.set(it.id, el); B.world.append(el); }
       else if (el._sig !== sigOf(it) && B.editingId !== it.id) fillCard(el, it);
       place(el, it);
+      if (it.type === 'link' && B.editingId !== it.id && wantPreview(it)) fetchPreview(it);
     }
     for (const [id, el] of B.els) if (!alive.has(id)) { el.remove(); B.els.delete(id); }
     paintSel();
@@ -658,12 +666,55 @@ function create(ctx) {
   }
 
   function linkView(it) {
-    return h('div', { class: 'bd-link' },
-      h('span', { class: 'bd-link-ico' }, icon('globe', 18)),
-      h('div', { class: 'bd-link-txt' },
-        h('b', {}, it.title || domainOf(it.url)),
-        h('span', {}, it.title ? domainOf(it.url) : it.url)),
+    const title = it.title || it.ptitle;
+    const loading = !it.pv && E && E.linkPreview;
+    const head = h('div', { class: 'bd-link-head' },
+      h('span', { class: 'bd-link-ico' }, icon(it.kind === 'video' ? 'video' : 'globe', 16)),
+      h('span', { class: 'bd-link-site' }, it.site ? it.site + ' · ' + domainOf(it.url) : domainOf(it.url)),
       h('button', { class: 'bd-link-open', type: 'button', 'aria-label': 'Открыть ссылку в браузере', title: 'Открыть в браузере' }, icon('ext', 15)));
+    const img = it.image ? h('div', { class: 'bd-link-img' + (it.kind === 'video' ? ' video' : '') },
+      lazyImg(it.imgThumb ? thumbUrl(it.image) : mediaUrl(it.image), 'bd-img', title || '', it.imgThumb ? mediaUrl(it.image) : null),
+      it.kind === 'video' ? h('span', { class: 'bd-link-play', 'aria-hidden': 'true' }, icon('play', 18)) : null) : null;
+    return h('div', { class: 'bd-link' + (it.image ? ' has-img' : '') + (loading ? ' loading' : '') },
+      img,
+      h('div', { class: 'bd-link-body' },
+        head,
+        h('b', { class: 'bd-link-title' }, title || domainOf(it.url)),
+        it.desc ? h('p', { class: 'bd-link-desc' }, it.desc) : null,
+        loading ? h('p', { class: 'bd-link-wait' }, 'Загружаю описание…') : null,
+        !title && !it.desc && !loading ? h('span', { class: 'bd-link-url' }, it.url) : null));
+  }
+  // Описание и превью ссылки загружаются один раз (и при смене адреса); без истории отмены.
+  const pvBusy = new Set();
+  function linkHeight(it) {
+    const imgH = it.image ? Math.round((it.w || 320) * 9 / 16) : 0;
+    return imgH + 58 + (it.desc ? 56 : 0) + ((it.title || it.ptitle) ? 18 : 0);
+  }
+  function wantPreview(it) {
+    if (!E || !E.linkPreview || it.type !== 'link' || !it.url || pvBusy.has(it.id)) return false;
+    return !it.pv || it.pvUrl !== it.url || (it.pv === 'fail' && Date.now() - (it.pvAt || 0) > 6 * 3600 * 1000);   // неудачу повторяем не чаще раза в 6 часов
+  }
+  function fetchPreview(it, force) {
+    if (!E || !E.linkPreview || !it.url || pvBusy.has(it.id)) return;
+    if (!force && !wantPreview(it)) return;
+    const id = it.id, url = it.url;
+    pvBusy.add(id);
+    E.linkPreview(url).then(r => r, () => ({ ok: false })).then(r => {
+      pvBusy.delete(id);
+      for (const [taskId, d] of docs) {
+        const x = d.items.find(y => y.id === id && y.type === 'link');
+        if (!x || x.url !== url) continue;
+        x.pv = r && r.ok ? 'ok' : 'fail'; x.pvUrl = url; x.pvAt = Date.now();
+        if (r && r.ok) {
+          x.ptitle = str(r.title, 300); x.desc = str(r.description, 600); x.site = str(r.site, 80);
+          if (r.kind) x.kind = r.kind; else delete x.kind;
+          if (r.image && mid(r.image.id)) { x.image = r.image.id; x.imgW = r.image.width || 0; x.imgH = r.image.height || 0; x.imgThumb = !!r.image.thumb; }
+          else { delete x.image; delete x.imgW; delete x.imgH; delete x.imgThumb; }
+        } else if (force) toast('Не удалось загрузить описание ссылки — проверьте интернет или адрес.');
+        if (B && B.doc === d) renderAll();
+        scheduleSave(taskId);
+      }
+    });
   }
   function linkEditor(it) {
     const u = h('input', { class: 'bd-in', type: 'url', placeholder: 'https://…', 'aria-label': 'Адрес ссылки', maxlength: '2000' });
@@ -826,6 +877,7 @@ function create(ctx) {
         if (it._raw != null) { const u = safeUrl(it._raw); if (u) it.url = u; else if (it._raw.trim()) toast('Это не похоже на адрес сайта. Нужна ссылка вида https://…'); }
         delete it._raw; delete it._draft;
         if (!it.url) B.doc.items.splice(B.doc.items.indexOf(it), 1);
+        else if (it.pvUrl !== it.url) { delete it.pv; fetchPreview(it); }
       }
       if (it.type === 'checklist') it.items = it.items.filter(x => x.text.trim() || x.done);
       if (el && itemById(id)) fillCard(el, it);
@@ -874,7 +926,7 @@ function create(ctx) {
     addItems([it], { edit: true, title: true });
   }
   function addLinkDraft(at) {
-    const it = { id: rid(), type: 'link', x: 0, y: 0, w: 300, h: 60, z: 0, url: '', title: '', _draft: true };
+    const it = { id: rid(), type: 'link', x: 0, y: 0, w: 320, h: 60, z: 0, url: '', title: '', _draft: true };
     const p = spot(it.w, 70, at); it.x = p.x; it.y = p.y;
     exitEdit();
     let z = maxZ(); it.z = z + 1;
@@ -885,7 +937,7 @@ function create(ctx) {
     B.editBefore = before;
   }
   function addLinks(urls, at) {
-    const items = urls.slice(0, 50).map(u => ({ id: rid(), type: 'link', x: 0, y: 0, w: 300, h: 60, z: 0, url: safeUrl(u), title: '' })).filter(it => it.url);
+    const items = urls.slice(0, 50).map(u => ({ id: rid(), type: 'link', x: 0, y: 0, w: 320, h: 60, z: 0, url: safeUrl(u), title: '' })).filter(it => it.url);
     if (!items.length) return;
     layout(items, at);
     addItems(items);
@@ -893,7 +945,7 @@ function create(ctx) {
   // Раскладка нескольких карточек сеткой без наложений: вокруг точки или в свободном месте.
   function layout(items, at) {
     const n = items.length, cols = Math.ceil(Math.sqrt(n));
-    const hOf = it => isMediaType(it.type) ? it.h + 34 : it.type === 'link' ? 64 : it.h + 20;    // у медиа — запас под подпись
+    const hOf = it => isMediaType(it.type) ? it.h + 34 : it.type === 'link' ? linkHeight(it) : it.h + 20;    // у медиа — запас под подпись
     const colW = Math.max(...items.map(it => it.w));
     let y = 0;
     for (let r = 0; r * cols < n; r++) {
@@ -1189,7 +1241,8 @@ function create(ctx) {
     const items = [];
     if (!multi) {
       if (it.type === 'note' || it.type === 'checklist' || it.type === 'link') items.push({ icon: 'pencil', label: 'Редактировать', run: () => enterEdit(it.id) });
-      if (it.type === 'link') items.push({ icon: 'ext', label: 'Открыть в браузере', run: () => openLink(it) });
+      if (it.type === 'link') items.push({ icon: 'ext', label: 'Открыть в браузере', run: () => openLink(it) },
+        E && E.linkPreview ? { icon: 'undo', label: 'Обновить описание и превью', run: () => fetchPreview(it, true) } : null);
       if (it.type === 'image') items.push({ icon: 'eye', label: 'Открыть просмотр', run: () => openViewer(it) },
         { icon: 'brush', label: it.overlay ? 'Изменить рисунок поверх' : 'Нарисовать поверх', run: () => drawOver(it) },
         it.overlay ? { icon: 'x', label: 'Убрать рисунок поверх', run: () => change(() => { delete it.overlay; }) } : null);
@@ -1546,7 +1599,7 @@ function create(ctx) {
       const o = { id: it.id, type: it.type, x: it.x, y: it.y, w: it.w, h: it.h };
       if (it.type === 'note') { o.text = it.text; if (it.color) o.color = it.color; }
       else if (it.type === 'checklist') { o.title = it.title; o.items = it.items.map(x => ({ text: x.text, done: x.done })); }
-      else if (it.type === 'link') { o.url = it.url; if (it.title) o.title = it.title; }
+      else if (it.type === 'link') { o.url = it.url; if (it.title || it.ptitle) o.title = it.title || it.ptitle; if (it.desc) o.description = it.desc; if (it.site) o.site = it.site; }
       else {
         if (it.name) o.file = it.name;
         if (it.caption) o.caption = it.caption;

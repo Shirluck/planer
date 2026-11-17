@@ -262,11 +262,11 @@ test.describe.serial('Доска страницы', () => {
     await page.keyboard.press('Escape');
     await page.keyboard.press('Escape');
     await expect(page.locator('.bd-sheet')).toHaveCount(0);
-    await expect(page.locator('.node[data-id="' + taskId + '"] .n-board .bc')).toHaveText(String(items.length));
+    await expect(page.locator('.node[data-id="' + taskId + '"]  .n-meta')).toHaveText(String(items.length));
     expect(errors.filter(e => !/Autofill|DevTools/.test(e))).toEqual([]);
     await closeApp(app);
     ({ app, page, errors } = await launch(dataDir, { size: [1440, 900] }));
-    await expect(page.locator('.node[data-id="' + taskId + '"] .n-board .bc')).toHaveText(String(items.length));
+    await expect(page.locator('.node[data-id="' + taskId + '"]  .n-meta')).toHaveText(String(items.length));
     await openBoard(page, taskId);
     await expect(cards()).toHaveCount(items.length);
     await page.click('.bd-zoom .bd-zb[aria-label^="Показать всё"]');

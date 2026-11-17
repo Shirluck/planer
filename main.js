@@ -1,9 +1,10 @@
 // Основной процесс: окно, хранение данных (документы + медиа), ключ API, запросы к API Anthropic.
-const { app, BrowserWindow, Menu, ipcMain, shell, safeStorage, protocol, dialog, clipboard, nativeImage } = require('electron');
+const { app, BrowserWindow, Menu, Tray, ipcMain, shell, safeStorage, protocol, dialog, clipboard, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { createStore, writeAtomic } = require('./lib/store');
 const { createMedia, sniff } = require('./lib/media');
+const { createLinkPreview } = require('./lib/linkpreview');
 
 // Одинаковая папка данных и в режиме разработки, и в собранном приложении:
 //   Windows: %APPDATA%\Planer     macOS: ~/Library/Application Support/Planer     Linux: ~/.config/Planer
@@ -20,7 +21,7 @@ const dir = () => app.getPath('userData');
 const keyFile = () => path.join(dir(), 'api-key.bin');
 const iconFile = path.join(__dirname, 'build', 'icon.png');
 let win = null;
-let store = null, media = null;
+let store = null, media = null, linkPreview = null;
 const notices = [];
 
 function sendToPage(channel, ...args) { if (win && !win.isDestroyed()) win.webContents.send(channel, ...args); }
@@ -38,6 +39,7 @@ function initStorage() {
     notices.push('Не удалось подготовить хранилище данных: ' + ((e && e.message) || e));
   }
   media = createMedia(dir(), { nativeImage });
+  linkPreview = createLinkPreview({ media, allowLocal: process.env.PLANER_ALLOW_LOCAL_PREVIEW === '1' });
   store.dailyBackup();
 }
 
@@ -92,6 +94,8 @@ ipcMain.handle('clip:writeText', async (_e, t) => {
   if (typeof t !== 'string' || t.length > 1e6) return false;
   try { await clipboard.writeText(t); return true; } catch (_) { return false; }
 });
+// Превью ссылки на доске: заголовок, описание, картинка (страницу загружает основной процесс).
+ipcMain.handle('link:preview', async (_e, url) => { try { return await linkPreview.fetchPreview(String(url || '').slice(0, 2048)); } catch (e) { return { ok: false, error: String((e && e.message) || e) }; } });
 ipcMain.handle('app:openUrl', async (_e, url) => {
   try {
     const u = new URL(String(url));
@@ -163,26 +167,69 @@ function createWindow() {
   // Никаких переходов со страницы (в том числе при случайном перетаскивании файла в окно).
   win.webContents.on('will-navigate', (e, url) => { if (url.split('#')[0] !== pageUrl) e.preventDefault(); });
 
-  // Перед закрытием окна страница дописывает несохранённые изменения.
+  // Крестик и «Свернуть» убирают окно в трей; полностью программа закрывается из меню значка в трее.
+  // Перед настоящим закрытием страница дописывает несохранённые изменения.
   let closeReady = false;
   win.on('close', e => {
     if (closeReady || win.webContents.isCrashed()) return;
     e.preventDefault();
-    let done = false;
-    const finish = () => {
-      if (done) return; done = true;
-      ipcMain.removeListener('app:flushed', onFlushed);
+    if (!quitting && tray) { hideToTray(); return; }
+    flushPage().then(() => {
       closeReady = true;
       try { store.flush(); } catch (_) {}
       if (win && !win.isDestroyed()) win.close();
       if (quitting) app.quit();
-    };
+    });
+  });
+  win.on('minimize', () => { if (tray && !isMac && !quitting) hideToTray(); });
+  win.on('closed', () => { win = null; });
+}
+// Страница дописывает несохранённое (ответ app:flushed или не дольше 2 секунд).
+function flushPage() {
+  return new Promise(resolve => {
+    if (!win || win.isDestroyed() || win.webContents.isCrashed()) { resolve(); return; }
+    let done = false;
+    const finish = () => { if (done) return; done = true; ipcMain.removeListener('app:flushed', onFlushed); resolve(); };
     const onFlushed = ev => { if (win && ev.sender === win.webContents) finish(); };
     ipcMain.on('app:flushed', onFlushed);
     win.webContents.send('app:flush');
     setTimeout(finish, 2000);
   });
-  win.on('closed', () => { win = null; });
+}
+
+/* ---------- трей ---------- */
+let tray = null, trayHintShown = false;
+function showWindow() {
+  if (!win) { createWindow(); return; }
+  if (win.isMinimized()) win.restore();
+  win.show(); win.focus();
+}
+function hideToTray() {
+  if (!win || win.isDestroyed()) return;
+  win.hide();
+  flushPage().then(() => { try { store.flush(); } catch (_) {} });
+  if (process.platform === 'win32' && !trayHintShown && !process.env.PLANER_TEST) {
+    trayHintShown = true;
+    const flag = path.join(dir(), 'tray-hint-shown');
+    if (!fs.existsSync(flag)) {
+      try { tray.displayBalloon({ title: 'Планер работает в трее', content: 'Окно убрано к часам. Чтобы выйти полностью, щёлкните значок правой кнопкой → «Выйти из Планера».', iconType: 'info' }); fs.writeFileSync(flag, '1'); } catch (_) {}
+    }
+  }
+}
+function quitFully() { quitting = true; app.quit(); }
+function createTray() {
+  if (!fs.existsSync(iconFile)) return;
+  const img = nativeImage.createFromPath(iconFile).resize({ width: isMac ? 18 : 32, height: isMac ? 18 : 32, quality: 'best' });
+  tray = new Tray(img);
+  tray.setToolTip('Планер');
+  tray.setContextMenu(Menu.buildFromTemplate([
+    { label: 'Открыть Планер', click: showWindow },
+    { type: 'separator' },
+    { label: 'Выйти из Планера', click: quitFully }
+  ]));
+  tray.on('click', showWindow);
+  tray.on('double-click', showWindow);
+  global.__planerTray = { isActive: () => !!tray && !tray.isDestroyed(), show: showWindow, quit: quitFully };   // для автотестов
 }
 
 function showAbout() {
@@ -218,7 +265,7 @@ function buildMenu() {
       { label: 'Открыть папку с данными', click: () => { try { store.flush(); } catch (_) {} shell.openPath(dir()); } },
       { label: 'Открыть папку с резервными копиями', click: () => { const b = path.join(dir(), 'backups'); fs.mkdirSync(b, { recursive: true }); shell.openPath(b); } }
     ] },
-    { label: 'Справка', submenu: [{ label: 'О программе', click: showAbout }] }
+    { label: 'Справка', submenu: [{ label: 'О программе', click: showAbout }, { type: 'separator' }, { label: 'Выйти из Планера', accelerator: 'CmdOrCtrl+Q', click: () => quitFully() }] }
   ];
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
@@ -229,16 +276,17 @@ process.on('unhandledRejection', e => { console.error('unhandled:', e); });
 if (!app.requestSingleInstanceLock()) {
   app.quit();           // второй экземпляр не запускаем: два окна затирали бы данные друг друга
 } else {
-  app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
+  app.on('second-instance', () => showWindow());
   if (process.platform === 'win32') app.setAppUserModelId('local.planer.desktop');
   app.setAboutPanelOptions({ applicationName: 'Планер', applicationVersion: app.getVersion() });
   app.whenReady().then(() => {
     initStorage();
     protocol.handle('media', req => media.handleRequest(req));
     buildMenu(); createWindow();
+    try { createTray(); } catch (e) { console.error('tray:', e); tray = null; }
     // Сборка мусора в медиа — после запуска, в фоне.
     setTimeout(() => { media.gc(() => store.allDocTexts()).catch(e => console.error('gc:', e)); }, Number(process.env.PLANER_GC_DELAY_MS) || 8000);
-    app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
+    app.on('activate', () => showWindow());
   });
   app.on('before-quit', () => { quitting = true; try { if (store) store.flush(); if (media) media.saveIndex(); } catch (_) {} });
   app.on('window-all-closed', () => { if (!isMac) app.quit(); });

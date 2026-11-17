@@ -46,6 +46,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   clipWriteText: t => ipcRenderer.invoke('clip:writeText', t),
   openUrl:  url => ipcRenderer.invoke('app:openUrl', url),
+  linkPreview: url => ipcRenderer.invoke('link:preview', url),
   notices:  () => ipcRenderer.invoke('app:notices'),
   appInfo:  () => ipcRenderer.invoke('app:info'),
   onFlush:  cb => { ipcRenderer.on('app:flush', async () => { try { await cb(); } catch (_) {} ipcRenderer.send('app:flushed'); }); },

@@ -41,7 +41,8 @@ test('задачи, страницы и папки работают как ра�
     await page.click('.toast button:has-text("Отменить")');
     await expect(items).toHaveCount(2);
     // страницы и папки
-    await page.locator('.col[data-key=plans] .tool[aria-label="Новая страница"]').click();
+    await page.locator('.col[data-key=plans] .tool[aria-label^="Новый файл"]').click();
+    await page.click('.menu-it:has-text("Текстовый документ")');
     await expect(page.locator('.sheet')).toBeVisible();
     await page.keyboard.type('Цели на год');
     await page.keyboard.press('Enter');
