@@ -24,6 +24,18 @@ test.describe.serial('Скриншоты', () => {
     await addTask(page, 'day', 'Позвонить в типографию');
     await addTask(page, 'day', 'Купить фасады для кухни !');
     await page.locator('.col[data-key=day] .item').nth(1).locator('.cb').click();
+    // блоки времени дня
+    for (const [f, t, n, c] of [['10:00', '12:00', 'Работа', 'blue'], ['14:00', '18:00', 'Встречи', 'orange']]) {
+      await page.click('.col[data-key=day] .tool[aria-label^="Добавить блок времени"]');
+      await page.locator('.tb-pop .tb-time-in').nth(0).fill(f); await page.locator('.tb-pop .tb-time-in').nth(1).fill(t);
+      await page.fill('.tb-pop .tb-name', n); await page.click('.tb-pop .tb-sw-b[data-color=' + c + ']');
+      if (n === 'Работа') await shot('time-block-editor-light');
+      await page.click('.tb-pop .tb-btn.primary');
+    }
+    const first = page.locator('.col[data-key=day] .tz[data-block=""] .item').first();
+    await first.hover(); await first.locator('.more').click(); await page.click('.menu-it:has-text("В блок 10:00–12:00")');
+    await page.locator('.col[data-key=day] .tblock').nth(1).locator('.tb-add').click();
+    await page.keyboard.type('Созвон с подрядчиком'); await page.keyboard.press('Enter'); await page.keyboard.press('Escape');
     // расписать другие дни недели через окно дня
     const days = (await page.locator('.col[data-key=week] .wk-day').evaluateAll(els => els.map(e => e.dataset.date))).filter(Boolean);
     const todayK = await page.locator('.col[data-key=week] .wk-day.today').getAttribute('data-date');

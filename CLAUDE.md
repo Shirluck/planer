@@ -24,6 +24,9 @@
 - Колонки `day` («Сегодня») и `week` («Неделя»-календарь) — это виды одного документа `cal` (`planner-cal`):
   `{ v:1, days:{ 'ГГГГ-ММ-ДД': { items:[{id, text, done, pri 0..3, note}] } }, undated:[…], hideDone, urgentOnly, showCal }`.
   Срочно = `pri 3` (`URGENT`): только такие задачи видны в обзоре недели. Пустые дни удаляются (`pruneDays`).
+  Блоки времени дня: `days[k].blocks = [{id, from:"10:00", to:"12:00", title, color}]`, у задачи `block` = id блока своего дня
+  (`normCal` снимает ссылки на несуществующие блоки; при переносе на другой день блок снимается). Группировка — `renderTaskGroups`.
+  Перетаскивание задач — свои pointer-события (`tdrag`), цели: `.tz[data-date][data-block]` ("*" — не менять блок), `.wk-day`, `.mc-day`.
   Задачу ищет `findTask(id)` → `{date, arr, i, t}` (`date` null = «Без даты»); изменения → `touch('cal')` + `refreshCal()`.
   Старые `planner-day`/`planner-week` переносит `migrateLegacy()` (один раз, если `planner-cal` ещё нет): day → сегодня, week → undated.
 - Разделы `plans`/`ideas`: `{ nodes: [папка {id,type:'folder',title,open,children} | страница {id,type:'page',title,blocks:[{id,t,text,done}], boardCount?, boardId?}] }`.

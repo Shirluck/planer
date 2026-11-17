@@ -23,7 +23,8 @@ test('задачи, страницы и папки работают как ра�
     await page.keyboard.type('детали');
     await page.locator('.col[data-key=day] .col-title').click();
     await expect(items.nth(1)).toHaveClass(/has-note/);
-    await page.locator('.col[data-key=day] .tool[aria-label="Отсортировать по приоритету"]').click();
+    await page.locator('.col[data-key=day] .col-tools .tool[aria-label="Ещё"]').click();
+    await page.click('.menu-it:has-text("Отсортировать по приоритету")');
     await expect(items.nth(0).locator('.txt')).toHaveValue('Срочная');
     // перенос на завтра через меню и обратно отменой
     await items.nth(0).hover();

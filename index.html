@@ -280,6 +280,67 @@ kbd{font:inherit;font-size:11.5px;background:var(--panel-2);border:1px solid var
 .day-head .prog{padding:12px 0 4px}
 .day-list{padding:4px 14px 8px}
 .day-composer{margin:2px 16px 12px}
+/* time blocks */
+.tz{position:relative;border-radius:9px}
+.tz-label{font-size:11.5px;font-weight:600;color:var(--muted);padding:4px 10px 0;text-transform:uppercase;letter-spacing:.04em}
+.tblock{--bc:var(--p1);position:relative;margin:8px 2px 6px;padding:2px 3px 6px;border-radius:12px;background:color-mix(in srgb,var(--bc) 8%,var(--panel));border:1px solid color-mix(in srgb,var(--bc) 32%,transparent)}
+.tblock[data-color=green]{--bc:var(--c-day)}
+.tblock[data-color=yellow]{--bc:var(--p2)}
+.tblock[data-color=orange]{--bc:var(--c-plans)}
+.tblock[data-color=pink]{--bc:var(--p3)}
+.tblock[data-color=purple]{--bc:var(--c-ideas)}
+.tblock.now{box-shadow:0 0 0 2px color-mix(in srgb,var(--bc) 45%,transparent)}
+.tb-head{display:flex;align-items:center;gap:7px;padding:6px 4px 3px 9px;color:var(--bc)}
+.tb-time{font-weight:700;font-size:12.5px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tb-title{font-size:12.5px;font-weight:600;color:var(--text);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tb-now{display:none;font-size:10.5px;font-weight:700;color:#fff;background:var(--bc);border-radius:999px;padding:1px 7px;white-space:nowrap}
+.tblock.now .tb-now{display:inline-block}
+.tb-cnt{margin-left:auto;font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.tb-head button{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;color:var(--muted);flex:none}
+.tb-head button:hover{background:color-mix(in srgb,var(--bc) 16%,transparent);color:var(--text)}
+.tblock .item:hover,.tblock .item:focus-within{background:color-mix(in srgb,var(--bc) 13%,var(--panel))}
+.tblock .item .cb:hover{border-color:var(--bc)}
+.tb-empty{font-size:12px;color:var(--muted);padding:2px 10px 2px 12px}
+.tb-form{margin:4px 4px 0;padding:6px 10px}
+.tb-pop{--accent:var(--c-day);width:300px;padding:12px 14px 12px}
+.tb-pop-title{display:flex;align-items:center;gap:8px;font-weight:650;font-size:14px;margin-bottom:12px}
+.tb-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:13px;color:var(--muted)}
+.tb-time-in,.tb-name{border:1px solid var(--line-2);border-radius:8px;padding:6px 8px;background:var(--panel-2);color:var(--text);font:inherit;font-size:13.5px;outline:none}
+.tb-time-in{width:96px;font-variant-numeric:tabular-nums}
+.tb-name{flex:1;min-width:0}
+.tb-time-in:focus,.tb-name:focus{border-color:var(--accent)}
+.tb-sw{display:flex;gap:7px;margin:2px 0 6px}
+.tb-sw-b{--bc:var(--p1);width:24px;height:24px;border-radius:7px;background:color-mix(in srgb,var(--bc) 35%,var(--panel));border:1.5px solid var(--bc)}
+.tb-sw-b[data-color=green]{--bc:var(--c-day)}.tb-sw-b[data-color=yellow]{--bc:var(--p2)}.tb-sw-b[data-color=orange]{--bc:var(--c-plans)}
+.tb-sw-b[data-color=pink]{--bc:var(--p3)}.tb-sw-b[data-color=purple]{--bc:var(--c-ideas)}
+.tb-sw-b[aria-checked=true]{box-shadow:0 0 0 2px var(--panel),0 0 0 3.5px var(--text)}
+.tb-err{color:var(--p3);font-size:12px;min-height:16px;margin-bottom:4px}
+.tb-copy{display:block;width:100%;text-align:left;font-size:12.5px;color:var(--accent);padding:6px 2px;margin-bottom:6px;border-radius:7px}
+.tb-copy:hover{text-decoration:underline}
+.tb-actions{display:flex;justify-content:flex-end;gap:6px}
+.tb-btn{padding:7px 14px;border-radius:9px;font-weight:600;font-size:13px;border:1px solid var(--line-2)}
+.tb-btn:hover{background:var(--hover)}
+.tb-btn.primary{background:var(--ink);color:var(--ink-text);border-color:transparent}
+.tb-btn.primary:hover{opacity:.9;background:var(--ink)}
+.wk-time{--bc:var(--p1);font-size:11px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--bc);background:color-mix(in srgb,var(--bc) 12%,transparent);border-radius:5px;padding:1px 5px;margin-top:1px;flex:none}
+.wk-time[data-color=green]{--bc:var(--c-day)}.wk-time[data-color=yellow]{--bc:var(--p2)}.wk-time[data-color=orange]{--bc:var(--c-plans)}
+.wk-time[data-color=pink]{--bc:var(--p3)}.wk-time[data-color=purple]{--bc:var(--c-ideas)}
+.day-block-btn{color:var(--c-day);background:color-mix(in srgb,var(--c-day) 10%,transparent)}
+.day-block-btn:hover{background:color-mix(in srgb,var(--c-day) 17%,transparent)}
+/* drag & drop of tasks */
+.item,.wk-task{touch-action:pan-y}
+.grip{cursor:grab}
+.item.drag-src,.wk-task.drag-src{opacity:.3}
+.task-ghost{position:fixed!important;left:0;top:0;z-index:400;pointer-events:none;margin:0;background:var(--panel)!important;border:1px solid var(--line-2);border-radius:10px;box-shadow:0 16px 36px rgba(0,0,0,.24);opacity:.97}
+.task-ghost .grip{opacity:1}
+body.task-dragging,body.task-dragging *{cursor:grabbing!important;user-select:none!important}
+body.task-dragging .tz:empty{min-height:28px;border:1.5px dashed var(--line-2)}
+.item.drop-after::after,.wk-task.drop-before::after,.wk-task.drop-after::after{content:"";position:absolute;left:8px;right:8px;height:2px;border-radius:2px;background:var(--accent)}
+.item.drop-after::after,.wk-task.drop-after::after{bottom:-1px;top:auto}
+.wk-task.drop-before::after{top:-1px}
+.tz.drop-end::after{content:"";position:absolute;left:8px;right:8px;bottom:0;height:2px;border-radius:2px;background:var(--accent)}
+.tz.drop-end:empty{background:color-mix(in srgb,var(--accent) 10%,transparent);border-color:var(--accent)}
+.tblock .tz.drop-end::after,.tblock .item.drop-before::after,.tblock .item.drop-after::after{background:var(--bc)}
 /* page boards */
 .n-acts .n-board{width:auto;min-width:26px;padding:0 5px;display:flex;align-items:center;gap:3px}
 .n-board .bc{font-size:11.5px;font-weight:650;font-variant-numeric:tabular-nums}
@@ -375,6 +436,7 @@ const IC = {
   head:'<path d="M5 5v14M19 5v14M5 12h14"/>',
   list:'<path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1" fill="currentColor"/><circle cx="4.5" cy="12" r="1" fill="currentColor"/><circle cx="4.5" cy="18" r="1" fill="currentColor"/>',
   todo:'<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8.5 12.5l2.5 2.5 4.5-5"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.2 2"/>',
   dot:'<circle cx="12" cy="12" r="2"/>'
 };
 function icon(n, s=16){
@@ -411,7 +473,15 @@ function defaults(k){
   const f = t => ({ id:newId(), type:'folder', title:t, open:true, children:[] });
   return { nodes: k === 'plans' ? [f('Работа'), f('Личное')] : [f('Проекты'), f('Заметки')] };
 }
-const normTask  = t => ({ id:String(t.id || newId()), text:String(t.text || ''), done:!!t.done, pri:Math.min(3, Math.max(0, t.pri | 0)), note:String(t.note || '') });
+const normTask  = t => {
+  const o = { id:String(t.id || newId()), text:String(t.text || ''), done:!!t.done, pri:Math.min(3, Math.max(0, t.pri | 0)), note:String(t.note || '') };
+  if (typeof t.block === 'string' && t.block) o.block = t.block.slice(0, 40);      // блок времени дня
+  return o;
+};
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+const BLOCK_COLOR_IDS = ['blue', 'green', 'yellow', 'orange', 'pink', 'purple'];
+const normTimeBlock = b => (b && TIME_RE.test(b.from) && TIME_RE.test(b.to) && b.from < b.to)
+  ? { id:String(b.id || newId()).slice(0, 40), from:b.from, to:b.to, title:String(b.title || '').slice(0, 60), color:BLOCK_COLOR_IDS.includes(b.color) ? b.color : 'blue' } : null;
 const normBlock = b => ({ id:String(b.id || newId()), t:BLOCK_TYPES.includes(b.t) ? b.t : 'p', text:String(b.text || ''), done:!!b.done });
 function normNode(n){
   if (n && n.type === 'folder') return { id:String(n.id || newId()), type:'folder', title:String(n.title || ''), open:n.open !== false, children:(n.children || []).map(normNode) };
@@ -423,9 +493,17 @@ function normNode(n){
 function normCal(d){
   d = d || {};
   const days = {};
-  if (d.days && typeof d.days === 'object') for (const [k, v] of Object.entries(d.days))
-    if (DATE_RE.test(k) && v && Array.isArray(v.items) && v.items.length) days[k] = { items:v.items.map(normTask) };
-  return { v:1, days, undated:(Array.isArray(d.undated) ? d.undated : []).map(normTask), hideDone:!!d.hideDone, urgentOnly:d.urgentOnly !== false, showCal:d.showCal !== false };
+  if (d.days && typeof d.days === 'object') for (const [k, v] of Object.entries(d.days)) {
+    if (!DATE_RE.test(k) || !v) continue;
+    const items = (Array.isArray(v.items) ? v.items : []).map(normTask);
+    const blocks = (Array.isArray(v.blocks) ? v.blocks : []).map(normTimeBlock).filter(Boolean);
+    const ids = new Set(blocks.map(b => b.id));
+    items.forEach(t => { if (t.block && !ids.has(t.block)) delete t.block; });
+    if (items.length || blocks.length) days[k] = blocks.length ? { items, blocks } : { items };
+  }
+  const undated = (Array.isArray(d.undated) ? d.undated : []).map(normTask);
+  undated.forEach(t => { delete t.block; });
+  return { v:1, days, undated, hideDone:!!d.hideDone, urgentOnly:d.urgentOnly !== false, showCal:d.showCal !== false };
 }
 function normalize(k, d){
   if (k === 'cal') return normCal(d);
@@ -459,7 +537,14 @@ function dayItems(k, create){
   if (!d) { if (!create) return []; d = S.cal.days[k] = { items:[] }; }
   return d.items;
 }
-function pruneDays(){ for (const k of Object.keys(S.cal.days)) if (!S.cal.days[k].items.length) delete S.cal.days[k]; }
+function pruneDays(){
+  for (const k of Object.keys(S.cal.days)) {
+    const d = S.cal.days[k];
+    if (d.blocks && !d.blocks.length) delete d.blocks;
+    if (!d.items.length && !d.blocks) delete S.cal.days[k];
+  }
+}
+const dayBlocks = k => (k && S.cal.days[k] && S.cal.days[k].blocks) || [];
 function findTask(id){
   for (const [k, d] of Object.entries(S.cal.days)) { const i = d.items.findIndex(t => t.id === id); if (i >= 0) return { date:k, arr:d.items, i, t:d.items[i] }; }
   const i = S.cal.undated.findIndex(t => t.id === id);
@@ -701,6 +786,7 @@ function refreshDates(){
     refreshCal();
   }
   shownToday = t;
+  paintNowBlocks();
 }
 setInterval(refreshDates, 60000);
 function refreshSection(k){
@@ -717,12 +803,15 @@ const firstLine = s => (s || '').split('\n').find(l => l.trim()) || '';
 const forRows = (id, fn) => document.querySelectorAll('.item[data-id="' + id + '"]').forEach(fn);
 const refreshWeekSoon = debounce(() => refreshWeek(), 250);
 
-function bindTaskList(list, getDate){
+function bindTaskList(list){
   list.addEventListener('click', e => {
+    const sec = e.target.closest('.tblock');
+    if (sec && e.target.closest('.tb-add')) { openBlockComposer(sec); return; }
+    if (sec && e.target.closest('.tb-more')) { blockMenu(e.target.closest('.tb-more'), sec); return; }
     const el = e.target.closest('.item'); if (!el) return;
     const loc = findTask(el.dataset.id); if (!loc) return; const t = loc.t;
     if (e.target.closest('.cb')) {
-      t.done = !t.done; forRows(t.id, r => paintItem(r, t)); touch('cal'); updateProgress(); paintDayProgress(); refreshWeek();
+      t.done = !t.done; forRows(t.id, r => paintItem(r, t)); touch('cal'); updateProgress(); paintDayProgress(); paintBlockCounts(); refreshWeek();
       if (t.done && S.cal.hideDone && list === cols.day.list) setTimeout(() => { if (el.isConnected && t.done) refreshToday(); }, 450);
     } else if (e.target.closest('.pri')) {
       t.pri = (t.pri + 1) % 4; forRows(t.id, r => paintItem(r, t)); touch('cal'); refreshWeek();
@@ -755,16 +844,19 @@ function bindTaskList(list, getDate){
     if (e.target.matches('.txt') && (e.key === 'Enter' || e.key === 'Escape') && !e.isComposing) { e.preventDefault(); e.stopPropagation(); e.target.blur(); }
     if (e.target.matches('.note') && e.key === 'Escape') { e.stopPropagation(); e.target.blur(); }
   });
-  setupDnD(list, getDate);
 }
 function taskMenu(anchor, t){
   const loc = findTask(t.id); if (!loc) return;
   const today = todayKey(), tom = addDays(today, 1);
+  const blocks = loc.date ? sortedBlocks(loc.date) : [];
   openMenu(anchor, [
     loc.date !== today ? { icon:'sun', label:'Перенести на сегодня', run:() => moveTask(t.id, today) } : null,
     loc.date !== tom ? { icon:'arrow', label:'Перенести на завтра', run:() => moveTask(t.id, tom) } : null,
     { icon:'cal', label:'Перенести на другой день…', run:() => pickDate(anchor, loc.date || today, d => moveTask(t.id, d)) },
     loc.date != null ? { icon:'x', label:'Убрать дату', run:() => moveTask(t.id, null) } : null,
+    blocks.length ? { sep:true } : null,
+    ...blocks.filter(b => b.id !== t.block).map(b => ({ icon:'clock', label:'В блок ' + blockLabel(b), run:() => setTaskBlock(t.id, b.id) })),
+    t.block ? { icon:'x', label:'Убрать из блока', run:() => setTaskBlock(t.id, null) } : null,
     { sep:true },
     { icon:'trash', danger:true, label:'Удалить', run:() => deleteTask(t.id) }
   ]);
@@ -778,7 +870,7 @@ function itemEl(t){
     h('div', { class:'acts' },
       h('button', { class:'pri', type:'button' }),
       h('button', { class:'note-btn', type:'button', 'aria-label':'Заметка', title:'Заметка' }, icon('note', 15)),
-      h('button', { class:'more', type:'button', 'aria-label':'Ещё', title:'Перенести, удалить' }, icon('more', 16))),
+      h('button', { class:'more', type:'button', 'aria-label':'Ещё', title:'Перенести, в блок, удалить' }, icon('more', 16))),
     h('div', { class:'note-wrap' },
       h('textarea', { class:'note', rows:'1', placeholder:'Заметка к задаче…', 'aria-label':'Заметка к задаче' }),
       h('div', { class:'note-prev', title:'Нажмите, чтобы изменить заметку' })));
@@ -799,13 +891,20 @@ function paintItem(el, t){
   el.classList.toggle('has-note', !!(t.note && t.note.trim()));
   el.querySelector('.note-prev').textContent = firstLine(t.note);
 }
-function addTask(date, input, list){
-  let text = input.value.trim(); if (!text) return;
-  let pri = 0; const m = text.match(/\s*(!{1,3})$/);
+function parseNewTask(raw){
+  let text = String(raw || '').trim(), pri = 0;
+  const m = text.match(/\s*(!{1,3})$/);
   if (m && text.length > m[0].length) { pri = m[1].length; text = text.slice(0, text.length - m[0].length).trim(); }
-  dayItems(date, true).push({ id:newId(), text, done:false, pri, note:'' });
+  return { text, pri };
+}
+function addTask(date, input, list, block){
+  const { text, pri } = parseNewTask(input.value); if (!text) return;
+  const t = { id:newId(), text, done:false, pri, note:'' };
+  if (block && dayBlocks(date).some(b => b.id === block)) t.block = block;
+  dayItems(date, true).push(t);
   input.value = ''; touch('cal'); refreshCal();
-  if (list) list.scrollTop = list.scrollHeight;
+  if (block && list) { const sec = list.querySelector('.tblock[data-block="' + block + '"]'); if (sec) openBlockComposer(sec); }
+  else if (list) list.scrollTop = list.scrollHeight;
 }
 function sortByPriority(date){
   const arr = dayItems(date); if (!arr.length) return;
@@ -826,56 +925,247 @@ function deleteTask(id){
   const undo = undoer(['cal']);
   loc.arr.splice(loc.i, 1); openNotes.delete(id); pruneDays(); touch('cal'); refreshCal(); toast('Задача удалена', undo);
 }
-// Перенос задачи на другой день (null — «Без даты») или на другое место в том же дне.
-function moveTask(id, date, beforeId){
+// Перенос задачи: другой день (null — «Без даты»), место в списке (перед beforeId) и блок времени.
+// block: id блока, null — без блока, undefined — оставить как есть в пределах того же дня.
+function moveTask(id, date, beforeId, block){
   const loc = findTask(id); if (!loc) return;
   if (date !== null && date !== undefined && !DATE_RE.test(date)) return;
   date = date === undefined ? null : date;
+  if (beforeId === id) beforeId = null;
   const undo = undoer(['cal']);
   const [t] = loc.arr.splice(loc.i, 1);
+  if (block !== undefined) { if (block && dayBlocks(date).some(b => b.id === block)) t.block = block; else delete t.block; }
+  else if (date !== loc.date) delete t.block;                  // блоки у каждого дня свои
   const dest = dayItems(date, true);
   const bi = beforeId ? dest.findIndex(x => x.id === beforeId) : -1;
   if (bi >= 0) dest.splice(bi, 0, t); else dest.push(t);
   pruneDays(); touch('cal'); refreshCal();
   if (date !== loc.date) toast(date == null ? 'Дата убрана: задача в «Без даты»' : 'Перенесено на ' + dayLabel(date), undo);
 }
+// В блок (или из блока) — задача встаёт в конец этой группы.
+function setTaskBlock(id, block){
+  const loc = findTask(id); if (!loc) return;
+  const t = loc.t, arr = loc.arr;
+  arr.splice(loc.i, 1);
+  if (block && dayBlocks(loc.date).some(b => b.id === block)) t.block = block; else { delete t.block; block = null; }
+  let at = -1;
+  arr.forEach((x, i) => { if ((x.block || null) === block) at = i; });
+  arr.splice(at >= 0 ? at + 1 : arr.length, 0, t);
+  touch('cal'); refreshCal();
+}
 
-/* drag & drop: порядок в списке, перенос на день недели или в ячейку календаря */
-let drag = null;
-function clearDrag(){
-  drag = null;
-  document.querySelectorAll('.dragging,.drop-before,.drop-end,.drop-on').forEach(x => x.classList.remove('dragging', 'drop-before', 'drop-end', 'drop-on'));
-  document.querySelectorAll('.item[draggable=true]').forEach(i => i.draggable = false);
+/* ---------- блоки времени дня: цветные группы задач ---------- */
+const BLOCK_COLORS = [['blue', 'Синий'], ['green', 'Зелёный'], ['yellow', 'Жёлтый'], ['orange', 'Оранжевый'], ['pink', 'Розовый'], ['purple', 'Сиреневый']];
+const sortedBlocks = k => dayBlocks(k).slice().sort((a, b) => a.from < b.from ? -1 : a.from > b.from ? 1 : a.to < b.to ? -1 : 1);
+const blockLabel = b => b.from + '–' + b.to + (b.title ? ' «' + b.title + '»' : '');
+const nowHM = () => { const d = new Date(); return pad2(d.getHours()) + ':' + pad2(d.getMinutes()); };
+const isNowIn = (k, b) => k === todayKey() && b.from <= nowHM() && nowHM() < b.to;
+const zoneEl = (date, block, kids) => h('div', { class:'tz', 'data-date':date || '', 'data-block':block }, kids);
+// Задачи дня: сначала без блока, затем блоки по времени начала.
+function renderTaskGroups(list, date, items){
+  const blocks = date ? sortedBlocks(date) : [];
+  const groups = new Map(blocks.map(b => [b.id, []])), loose = [];
+  items.forEach(t => (t.block && groups.has(t.block) ? groups.get(t.block) : loose).push(t));
+  if (blocks.length && loose.length) list.append(h('div', { class:'tz-label' }, 'В любое время'));
+  list.append(zoneEl(date, '', loose.map(itemEl)));
+  blocks.forEach(b => list.append(timeBlockEl(date, b, groups.get(b.id))));
 }
-function setupDnD(list, getDate){
-  list.addEventListener('pointerdown', e => { const g = e.target.closest('.grip'); if (g) g.closest('.item').draggable = true; });
-  list.addEventListener('pointerup', () => list.querySelectorAll('.item[draggable=true]').forEach(i => i.draggable = false));
-  list.addEventListener('dragstart', e => {
-    const el = e.target.closest && e.target.closest('.item'); if (!el || !el.draggable) return;
-    drag = { id:el.dataset.id }; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', el.dataset.id);
-    setTimeout(() => el.classList.add('dragging'), 0);
+function timeBlockEl(date, b, items){
+  const all = dayItems(date).filter(t => t.block === b.id), done = all.filter(t => t.done).length;
+  return h('section', { class:'tblock' + (isNowIn(date, b) ? ' now' : ''), 'data-color':b.color, 'data-block':b.id, 'data-date':date, 'data-from':b.from, 'data-to':b.to, 'aria-label':'Блок ' + blockLabel(b) },
+    h('div', { class:'tb-head' },
+      icon('clock', 14),
+      h('span', { class:'tb-time' }, b.from + ' – ' + b.to),
+      b.title ? h('span', { class:'tb-title' }, b.title) : null,
+      h('span', { class:'tb-now' }, 'сейчас'),
+      h('span', { class:'tb-cnt' }, all.length ? done + '/' + all.length : ''),
+      h('button', { class:'tb-add', type:'button', 'aria-label':'Добавить задачу в блок ' + blockLabel(b), title:'Добавить задачу в блок' }, icon('plus', 15)),
+      h('button', { class:'tb-more', type:'button', 'aria-label':'Блок ' + blockLabel(b) + ': изменить или удалить', title:'Изменить или удалить блок' }, icon('more', 15))),
+    zoneEl(date, b.id, items.map(itemEl)),
+    items.length ? null : h('div', { class:'tb-empty' }, all.length ? 'Выполненные задачи скрыты' : 'Перетащите сюда задачи или нажмите +'));
+}
+function paintNowBlocks(){ document.querySelectorAll('.tblock').forEach(s => s.classList.toggle('now', isNowIn(s.dataset.date, { from:s.dataset.from, to:s.dataset.to }))); }
+function paintBlockCounts(){
+  document.querySelectorAll('.tblock').forEach(s => {
+    const all = dayItems(s.dataset.date).filter(t => t.block === s.dataset.block), d = all.filter(t => t.done).length;
+    const c = s.querySelector('.tb-cnt'); if (c) c.textContent = all.length ? d + '/' + all.length : '';
   });
-  list.addEventListener('dragend', clearDrag);
-  const targetBefore = e => {
-    const items = [...list.querySelectorAll('.item:not(.dragging)')];
-    return items.find(it => { const r = it.getBoundingClientRect(); return e.clientY < r.top + r.height / 2; }) || null;
+}
+function openBlockComposer(sec){
+  let f = sec.querySelector('.tb-form'); if (f) { f.querySelector('input').focus(); return; }
+  const inp = h('input', { class:'add-input', type:'text', placeholder:'Задача в этот блок (!!! — срочно)', 'aria-label':'Новая задача в блоке', autocomplete:'off', enterkeyhint:'done' });
+  f = h('form', { class:'composer tb-form', onsubmit:e => { e.preventDefault(); addTask(sec.dataset.date || null, inp, sec.closest('.list'), sec.dataset.block); } }, icon('plus', 15), inp);
+  inp.addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); f.remove(); } });
+  inp.addEventListener('blur', () => setTimeout(() => { if (f.isConnected && !inp.value.trim() && document.activeElement !== inp) f.remove(); }, 150));
+  const em = sec.querySelector('.tb-empty'); if (em) em.remove();
+  sec.append(f); inp.focus();
+}
+function blockMenu(anchor, sec){
+  const date = sec.dataset.date, b = dayBlocks(date).find(x => x.id === sec.dataset.block); if (!b) return;
+  openMenu(anchor, [
+    { icon:'plus', label:'Добавить задачу в блок', run:() => openBlockComposer(sec) },
+    { icon:'pencil', label:'Изменить время, название, цвет', run:() => blockEditor(anchor, date, b) },
+    { sep:true },
+    { icon:'trash', danger:true, label:'Удалить блок (задачи останутся)', run:() => deleteBlock(date, b.id) }
+  ]);
+}
+function deleteBlock(date, id){
+  const day = S.cal.days[date]; if (!day || !day.blocks) return;
+  const undo = undoer(['cal']);
+  day.blocks = day.blocks.filter(b => b.id !== id);
+  day.items.forEach(t => { if (t.block === id) delete t.block; });
+  pruneDays(); touch('cal'); refreshCal(); toast('Блок удалён, задачи остались в дне', undo);
+}
+const addHours = (hm, n) => { const [hh, mm] = hm.split(':').map(Number); const v = Math.min(23 * 60 + 59, hh * 60 + mm + n * 60); return pad2(Math.floor(v / 60)) + ':' + pad2(v % 60); };
+function suggestBlock(date){
+  const bl = sortedBlocks(date), used = new Set(bl.map(b => b.color));
+  let from = bl.length ? bl[bl.length - 1].to : (date === todayKey() ? pad2(Math.min(22, new Date().getHours() + 1)) + ':00' : '09:00');
+  if (from >= '23:00') from = '09:00';
+  const color = (BLOCK_COLORS.find(([c]) => !used.has(c)) || BLOCK_COLORS[0])[0];
+  return { from, to:addHours(from, 2), title:'', color };
+}
+function prevBlocksDay(date){
+  for (let i = 1; i <= 60; i++) { const k = addDays(date, -i), d = S.cal.days[k]; if (d && d.blocks && d.blocks.length) return k; }
+  return null;
+}
+// Всплывающий редактор блока: время «с … до …», название, цвет.
+function blockEditor(anchor, date, block){
+  if (!date) return;
+  closeMenu();
+  const def = block || suggestBlock(date);
+  const from = h('input', { type:'time', class:'tb-time-in', 'aria-label':'Начало блока', required:true });
+  const to = h('input', { type:'time', class:'tb-time-in', 'aria-label':'Конец блока', required:true });
+  from.value = def.from; to.value = def.to;
+  const name = h('input', { type:'text', class:'tb-name', placeholder:'Название (необязательно), например «Работа»', maxlength:'60', 'aria-label':'Название блока' });
+  name.value = def.title || '';
+  let color = def.color;
+  const sw = h('div', { class:'tb-sw', role:'radiogroup', 'aria-label':'Цвет блока' }, BLOCK_COLORS.map(([c, n]) => h('button', {
+    type:'button', class:'tb-sw-b', 'data-color':c, role:'radio', 'aria-checked':String(c === color), 'aria-label':n, title:n,
+    onclick:() => { color = c; sw.querySelectorAll('button').forEach(x => x.setAttribute('aria-checked', String(x.dataset.color === c))); } })));
+  const err = h('div', { class:'tb-err', role:'alert' });
+  const prev = !block && !dayBlocks(date).length ? prevBlocksDay(date) : null;
+  const save = () => {
+    const f = from.value, t = to.value;
+    if (!TIME_RE.test(f) || !TIME_RE.test(t)) { err.textContent = 'Укажите время начала и конца.'; return; }
+    if (t <= f) { err.textContent = 'Конец должен быть позже начала: например, 12:00 – 18:00.'; return; }
+    const undo = undoer(['cal']);
+    const day = S.cal.days[date] || (S.cal.days[date] = { items:[] });
+    day.blocks = day.blocks || [];
+    const data = { from:f, to:t, title:name.value.trim().slice(0, 60), color };
+    if (block) { const b = day.blocks.find(x => x.id === block.id); if (b) Object.assign(b, data); }
+    else day.blocks.push(Object.assign({ id:newId() }, data));
+    closeMenu(); touch('cal'); refreshCal();
+    toast(block ? 'Блок изменён' : 'Блок ' + f + ' – ' + t + ' добавлен', undo);
   };
-  list.addEventListener('dragover', e => {
-    if (!drag) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move';
-    document.querySelectorAll('.drop-before,.drop-end').forEach(x => x.classList.remove('drop-before', 'drop-end'));
-    const t = targetBefore(e); if (t) t.classList.add('drop-before'); else list.classList.add('drop-end');
-  });
-  list.addEventListener('dragleave', e => { if (!list.contains(e.relatedTarget)) { list.querySelectorAll('.drop-before').forEach(x => x.classList.remove('drop-before')); list.classList.remove('drop-end'); } });
-  list.addEventListener('drop', e => {
-    if (!drag) return; e.preventDefault();
-    const t = targetBefore(e), id = drag.id; clearDrag();
-    moveTask(id, getDate(), t ? t.dataset.id : null);
-  });
+  const pop = h('form', { class:'menu tb-pop', role:'dialog', 'aria-label':block ? 'Изменить блок времени' : 'Новый блок времени', onsubmit:e => { e.preventDefault(); save(); } },
+    h('div', { class:'tb-pop-title' }, icon('clock', 16), block ? 'Блок времени' : 'Новый блок времени'),
+    h('div', { class:'tb-row' }, h('span', {}, 'с'), from, h('span', {}, 'до'), to),
+    h('div', { class:'tb-row' }, name),
+    sw, err,
+    prev ? h('button', { type:'button', class:'tb-copy', onclick:() => { closeMenu(); copyBlocks(prev, date); } },
+      'Взять блоки из ' + fmtDate(prev, { weekday:'short', day:'numeric', month:'short' }) + ' (' + dayBlocks(prev).length + ')') : null,
+    h('div', { class:'tb-actions' },
+      h('button', { type:'button', class:'tb-btn', onclick:() => closeMenu() }, 'Отмена'),
+      h('button', { type:'submit', class:'tb-btn primary' }, block ? 'Сохранить' : 'Создать')));
+  pop.addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeMenu(); } });
+  menuEl = pop; placePopup(anchor, pop); from.focus();
 }
-function dropZone(el, date){
-  el.addEventListener('dragover', e => { if (!drag) return; e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'move'; el.classList.add('drop-on'); });
-  el.addEventListener('dragleave', e => { if (!el.contains(e.relatedTarget)) el.classList.remove('drop-on'); });
-  el.addEventListener('drop', e => { if (!drag) return; e.preventDefault(); e.stopPropagation(); const id = drag.id; clearDrag(); moveTask(id, date); });
+function copyBlocks(src, date){
+  const undo = undoer(['cal']);
+  const day = S.cal.days[date] || (S.cal.days[date] = { items:[] });
+  day.blocks = (day.blocks || []).concat(dayBlocks(src).map(b => ({ id:newId(), from:b.from, to:b.to, title:b.title, color:b.color })));
+  touch('cal'); refreshCal(); toast('Блоки скопированы: ' + dayBlocks(src).length, undo);
+}
+
+/* ---------- перетаскивание задач мышью: порядок, блоки, дни недели, числа календаря ---------- */
+let tdrag = null, justDragged = false;
+const zoneTarget = z => ({ date:z.dataset.date || null, block:z.dataset.block === '*' ? undefined : (z.dataset.block || null) });
+function clearDropMarks(){ document.querySelectorAll('.drop-before,.drop-after,.drop-end,.drop-on').forEach(x => x.classList.remove('drop-before', 'drop-after', 'drop-end', 'drop-on')); }
+document.addEventListener('click', e => { if (justDragged) { e.preventDefault(); e.stopPropagation(); } }, true);
+document.addEventListener('pointerdown', e => {
+  if (e.button !== 0 || tdrag) return;
+  const row = e.target.closest && e.target.closest('.item[data-id], .wk-task[data-id]');
+  if (!row || !row.isConnected) return;
+  const onGrip = !!e.target.closest('.grip');
+  if (e.pointerType === 'touch' && !onGrip) return;                       // на сенсорном экране — только за ручку
+  if (!onGrip && e.target.closest('button, input, a, .note-wrap')) return; // кнопки работают как обычно
+  const ta = e.target.closest('textarea');
+  if (ta && document.activeElement === ta) return;                         // в режиме ввода текста — выделение, а не перенос
+  if (onGrip) e.preventDefault();
+  const sx = e.clientX, sy = e.clientY, pid = e.pointerId;
+  const move = ev => {
+    if (ev.pointerId !== pid) return;
+    if (!tdrag) { if (Math.hypot(ev.clientX - sx, ev.clientY - sy) < 6) return; startTaskDrag(row, sx, sy); }
+    ev.preventDefault();
+    dragOverTask(ev.clientX, ev.clientY);
+  };
+  const stop = cancel => {
+    window.removeEventListener('pointermove', move, true); window.removeEventListener('pointerup', up, true);
+    window.removeEventListener('pointercancel', cancelUp, true); document.removeEventListener('keydown', key, true);
+    if (tdrag) finishTaskDrag(cancel);
+  };
+  const up = ev => { if (ev.pointerId === pid) stop(false); };
+  const cancelUp = ev => { if (ev.pointerId === pid) stop(true); };
+  const key = ev => { if (ev.key === 'Escape' && tdrag) { ev.preventDefault(); ev.stopPropagation(); stop(true); } };
+  window.addEventListener('pointermove', move, true); window.addEventListener('pointerup', up, true);
+  window.addEventListener('pointercancel', cancelUp, true); document.addEventListener('keydown', key, true);
+}, true);
+function startTaskDrag(row, sx, sy){
+  closeMenu();
+  const a = document.activeElement; if (a && row.contains(a) && a.blur) a.blur();
+  try { window.getSelection().removeAllRanges(); } catch (e) {}
+  const r = row.getBoundingClientRect();
+  const ghost = row.cloneNode(true);
+  const srcTa = row.querySelectorAll('textarea');
+  ghost.querySelectorAll('textarea').forEach((x, i) => { x.value = srcTa[i] ? srcTa[i].value : ''; });
+  ghost.classList.add('task-ghost'); ghost.classList.remove('drop-before', 'drop-after');
+  ghost.style.width = r.width + 'px';
+  ghost.style.setProperty('--accent', getComputedStyle(row).getPropertyValue('--accent'));
+  ghost.setAttribute('aria-hidden', 'true');
+  document.body.append(ghost);
+  tdrag = { id:row.dataset.id, row, ghost, dx:sx - r.left, dy:sy - r.top, target:null, x:sx, y:sy, scroll:null, raf:0 };
+  row.classList.add('drag-src'); document.body.classList.add('task-dragging');
+  autoScrollLoop();
+}
+function dragOverTask(x, y){
+  const d = tdrag; if (!d) return;
+  d.x = x; d.y = y;
+  d.ghost.style.transform = 'translate(' + (x - d.dx) + 'px,' + (y - d.dy) + 'px) rotate(1deg)';
+  clearDropMarks(); d.target = null;
+  const el = document.elementFromPoint(x, y); if (!el) return;
+  const list = el.closest('.list');
+  d.scroll = null;
+  if (list) { const lr = list.getBoundingClientRect(); if (y < lr.top + 36) d.scroll = { list, dir:-1 }; else if (y > lr.bottom - 36) d.scroll = { list, dir:1 }; }
+  const it = el.closest('.item[data-id], .wk-task[data-id]');
+  if (it && it !== d.row && it.closest('.tz') && !it.closest('.task-ghost')) {
+    const zone = it.closest('.tz'), r = it.getBoundingClientRect(), after = y > r.top + r.height / 2;
+    let before = it.dataset.id;
+    if (after) { let n = it.nextElementSibling; while (n && (!n.dataset.id || n === d.row)) n = n.nextElementSibling; before = n ? n.dataset.id : null; }
+    it.classList.add(after ? 'drop-after' : 'drop-before');
+    d.target = Object.assign(zoneTarget(zone), { beforeId:before });
+    return;
+  }
+  if (it === d.row) return;                                                // над собой — без изменений
+  let zone = el.closest('.tz') || (el.closest('.tblock') && el.closest('.tblock').querySelector('.tz'));
+  if (!zone && list && list.querySelector('.tz') && !el.closest('.wk-day')) { const zs = list.querySelectorAll('.tz'); zone = zs[zs.length - 1]; }
+  if (zone) { zone.classList.add('drop-end'); d.target = Object.assign(zoneTarget(zone), { beforeId:null }); return; }
+  const wd = el.closest('.wk-day');
+  if (wd) { wd.classList.add('drop-on'); d.target = { date:wd.dataset.date || null, block:undefined, beforeId:null }; return; }
+  const mc = el.closest('.col[data-key=week] .mc-day');
+  if (mc) { mc.classList.add('drop-on'); d.target = { date:mc.dataset.date, block:undefined, beforeId:null }; }
+}
+function autoScrollLoop(){
+  const d = tdrag; if (!d) return;
+  if (d.scroll) { d.scroll.list.scrollTop += d.scroll.dir * 9; dragOverTask(d.x, d.y); }
+  d.raf = requestAnimationFrame(autoScrollLoop);
+}
+function finishTaskDrag(cancel){
+  const d = tdrag; tdrag = null; if (!d) return;
+  cancelAnimationFrame(d.raf);
+  d.ghost.remove(); d.row.classList.remove('drag-src'); document.body.classList.remove('task-dragging'); clearDropMarks();
+  justDragged = true; setTimeout(() => { justDragged = false; }, 0);
+  if (cancel || !d.target) return;
+  moveTask(d.id, d.target.date, d.target.beforeId, d.target.block);
 }
 
 /* ---------- колонка «Сегодня»: план на сегодняшнюю дату ---------- */
@@ -885,7 +1175,9 @@ function buildTodayCol(){
   const input = h('input', { class:'add-input', type:'text', placeholder:'Новая задача (!!! — срочно)', title:'Добавьте ! или !! или !!! в конце, чтобы сразу задать приоритет. !!! — срочно', 'aria-label':'Новая задача на сегодня', autocomplete:'off', enterkeyhint:'done' });
   const form = h('form', { class:'composer', onsubmit:e => { e.preventDefault(); addTask(todayKey(), input, list); } }, icon('plus', 16), input);
   const eye = tool('eye', 'Скрыть выполненные', () => { S.cal.hideDone = !S.cal.hideDone; touch('cal'); refreshToday(); });
+  const clock = tool('clock', 'Добавить блок времени (например, 10:00–12:00)', () => blockEditor(clock, todayKey(), null));
   const more = tool('more', 'Ещё', () => openMenu(more, [
+    { icon:'clock', label:'Добавить блок времени', run:() => blockEditor(more, todayKey(), null) },
     { icon:'cal', label:'Открыть день целиком', run:() => openDay(todayKey()) },
     { icon:'eye', label:S.cal.hideDone ? 'Показать выполненные' : 'Скрыть выполненные', run:() => eye.click() },
     { icon:'sort', label:'Отсортировать по приоритету', run:() => sortByPriority(todayKey()) },
@@ -897,9 +1189,9 @@ function buildTodayCol(){
   const root = h('section', { class:'col', 'data-key':'day', 'aria-label':cfg.title },
     h('div', { class:'col-head' },
       h('div', { class:'col-title' }, h('span', { class:'ico' }, icon(cfg.icon, 19)), h('h2', {}, cfg.title)),
-      h('div', { class:'col-tools' }, tool('sort', 'Отсортировать по приоритету', () => sortByPriority(todayKey())), eye, more)),
+      h('div', { class:'col-tools' }, clock, eye, more)),
     sub, h('div', { class:'prog' }, h('div', { class:'bar' }, bar), n), list, form);
-  bindTaskList(list, () => todayKey());
+  bindTaskList(list);
   return { root, list, sub, bar, n, eye, input };
 }
 function updateProgress(){
@@ -916,7 +1208,7 @@ function overdueTasks(){
 }
 function refreshToday(){
   const c = cols.day; if (!c) return;
-  const items = dayItems(todayKey()), hide = S.cal.hideDone;
+  const today = todayKey(), items = dayItems(today), hide = S.cal.hideDone;
   updateProgress();
   c.eye.replaceChildren(icon(hide ? 'eyeoff' : 'eye', 17));
   c.eye.setAttribute('aria-pressed', String(hide));
@@ -924,8 +1216,8 @@ function refreshToday(){
   c.eye.title = lab; c.eye.setAttribute('aria-label', lab);
   const vis = hide ? items.filter(t => !t.done) : items;
   c.list.replaceChildren();
-  if (!vis.length) c.list.append(h('div', { class:'empty' }, items.length ? 'Все дела на сегодня выполнены' : SECTIONS.day.empty));
-  vis.forEach(t => c.list.append(itemEl(t)));
+  if (!vis.length && !dayBlocks(today).length) c.list.append(h('div', { class:'empty' }, items.length ? 'Все дела на сегодня выполнены' : SECTIONS.day.empty));
+  renderTaskGroups(c.list, today, vis);
   const od = overdueTasks();
   if (od.length) c.list.append(overdueEl(od));
   c.list.querySelectorAll('textarea').forEach(autosize);
@@ -946,7 +1238,7 @@ function overdueEl(list){
 function moveAllOverdue(){
   const od = overdueTasks(); if (!od.length) return;
   const undo = undoer(['cal']), dest = dayItems(todayKey(), true);
-  od.forEach(({ t }) => { const loc = findTask(t.id); if (loc) { loc.arr.splice(loc.i, 1); dest.push(t); } });
+  od.forEach(({ t }) => { const loc = findTask(t.id); if (loc) { loc.arr.splice(loc.i, 1); delete t.block; dest.push(t); } });
   pruneDays(); touch('cal'); refreshCal(); toast('Перенесено на сегодня: ' + tasksWord(od.length), undo);
 }
 
@@ -972,10 +1264,8 @@ function monthGrid(m, o){
       k === o.picked && 'picked', st.n && 'has', st.urgent && 'urgent', wd >= 5 && 'we'].filter(Boolean).join(' ');
     const label = cap(fmtDate(k, { weekday:'long', day:'numeric', month:'long' })) + (st.n ? ': ' + tasksWord(st.n) + (st.urgent ? ', срочных ' + st.urgent : '') : '');
     const day = k;
-    const b = h('button', { class:cls, type:'button', 'data-date':k, 'aria-label':label, title:label, onclick:() => o.onPick(day) },
-      h('span', { class:'mc-n' }, String(parseKey(k).getDate())), h('i', { class:'mc-dot' }));
-    if (o.drop) dropZone(b, day);
-    grid.append(b);
+    grid.append(h('button', { class:cls, type:'button', 'data-date':k, 'aria-label':label, title:label, onclick:() => o.onPick(day) },
+      h('span', { class:'mc-n' }, String(parseKey(k).getDate())), h('i', { class:'mc-dot' })));
   }
   return grid;
 }
@@ -1008,6 +1298,7 @@ const fmtRange = (a, b) => parseKey(a).getMonth() === parseKey(b).getMonth()
   : fmtDate(a, { day:'numeric', month:'short' }) + ' – ' + fmtDate(b, { day:'numeric', month:'short' });
 function refreshWeek(){
   const c = cols.week; if (!c) return;
+  if (tdrag) { refreshWeekSoon(); return; }                 // не перестраиваем под перетаскиваемой задачей
   const st = S.cal, today = todayKey(), thisWeek = weekStart === mondayOf(today);
   const setTool = (b, on, label) => { b.setAttribute('aria-pressed', String(on)); b.title = label; b.setAttribute('aria-label', label); };
   setTool(c.urgT, st.urgentOnly, st.urgentOnly ? 'Сейчас видны только срочные — показать все задачи' : 'Сейчас видны все задачи — показать только срочные');
@@ -1016,12 +1307,13 @@ function refreshWeek(){
   c.calBox.hidden = !st.showCal;
   if (st.showCal) c.calBox.replaceChildren(h('div', { class:'mc' },
     monthHead(calMonth, d => { calMonth = addMonths(calMonth, d); weekStart = monthOf(today) === calMonth ? mondayOf(today) : mondayOf(calMonth + '-01'); refreshWeek(); }),
-    monthGrid(calMonth, { week:weekStart, drop:true, onPick:k => { weekStart = mondayOf(k); calMonth = monthOf(k); refreshWeek(); openDay(k); } })));
+    monthGrid(calMonth, { week:weekStart, onPick:k => { weekStart = mondayOf(k); calMonth = monthOf(k); refreshWeek(); openDay(k); } })));
   const days = [0, 1, 2, 3, 4, 5, 6].map(i => addDays(weekStart, i));
   const all = days.flatMap(k => dayItems(k)), done = all.filter(t => t.done).length;
   c.n.textContent = all.length ? done + ' / ' + all.length : '';
   c.bar.style.width = all.length ? (done / all.length * 100) + '%' : '0%';
   const nav = d => () => { weekStart = addDays(weekStart, d * 7); calMonth = monthOf(addDays(weekStart, 3)); refreshWeek(); };
+  const scroll = c.list.scrollTop;
   c.list.classList.toggle('all', !st.urgentOnly);
   c.list.replaceChildren(h('div', { class:'wk-nav' },
     h('button', { class:'mc-nav flip', type:'button', 'aria-label':'Предыдущая неделя', title:'Предыдущая неделя', onclick:nav(-1) }, icon('chev', 15)),
@@ -1033,6 +1325,7 @@ function refreshWeek(){
   if (!shown) c.list.append(h('div', { class:'wk-hint' }, st.urgentOnly
     ? 'Срочных задач на этой неделе нет. Нажмите на день, чтобы расписать его; задача с !!! в конце — срочная и появится здесь.'
     : 'На этой неделе задач нет. Нажмите на день, чтобы расписать его.'));
+  c.list.scrollTop = scroll;
 }
 function weekDayEl(k){
   const items = dayItems(k), today = todayKey();
@@ -1048,21 +1341,21 @@ function weekDayEl(k){
         h('span', { class:'wk-num' }, fmtDate(k, { day:'numeric', month:'short' })),
         relDay(k) ? h('span', { class:'wk-rel' }, relDay(k)) : null,
         h('span', { class:'wk-cnt' }, cnt), icon('chev', 14));
+  const blocks = k ? dayBlocks(k) : [];
   const el = h('div', { class:'wk-day' + (k === today ? ' today' : '') + (k != null && k < today ? ' past' : '') + (k == null ? ' undated' : ''), 'data-date':k || '' },
-    head, show.length ? h('div', { class:'wk-tasks' }, show.map(t => weekTaskEl(t, k))) : null);
-  dropZone(el, k);
+    head, show.length ? h('div', { class:'wk-tasks tz', 'data-date':k || '', 'data-block':'*' }, show.map(t => weekTaskEl(t, k, blocks))) : null);
   return { el, shown:show.length };
 }
-function weekTaskEl(t, k){
-  const row = h('div', { class:'wk-task' + (t.done ? ' done' : ''), 'data-id':t.id, 'data-pri':t.pri, draggable:'true', title:'Открыть день' },
+function weekTaskEl(t, k, blocks){
+  const b = t.block && blocks.find(x => x.id === t.block);
+  const row = h('div', { class:'wk-task' + (t.done ? ' done' : ''), 'data-id':t.id, 'data-pri':t.pri, title:'Открыть день' },
     h('button', { class:'cb', type:'button', role:'checkbox', 'aria-checked':String(t.done), 'aria-label':'Выполнено: ' + t.text }, icon('check', 12)),
+    b ? h('span', { class:'wk-time', 'data-color':b.color, title:blockLabel(b) }, b.from) : null,
     h('span', { class:'wk-t' }, t.text || 'Без названия'));
   row.addEventListener('click', e => {
-    if (e.target.closest('.cb')) { t.done = !t.done; touch('cal'); forRows(t.id, r => paintItem(r, t)); updateProgress(); paintDayProgress(); refreshWeek(); return; }
+    if (e.target.closest('.cb')) { t.done = !t.done; touch('cal'); forRows(t.id, r => paintItem(r, t)); updateProgress(); paintDayProgress(); paintBlockCounts(); refreshWeek(); return; }
     openDay(k, t.id);
   });
-  row.addEventListener('dragstart', e => { drag = { id:t.id }; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', t.id); setTimeout(() => row.classList.add('dragging'), 0); });
-  row.addEventListener('dragend', clearDrag);
   return row;
 }
 
@@ -1078,17 +1371,18 @@ function openDay(date, focusId){
   const bar = h('i'), n = h('span', { class:'n' });
   const prev = h('button', { class:'tool flip', type:'button', 'aria-label':'Предыдущий день', title:'Предыдущий день (Alt+←)', onclick:() => shiftDay(-1) }, icon('chev', 17));
   const next = h('button', { class:'tool', type:'button', 'aria-label':'Следующий день', title:'Следующий день (Alt+→)', onclick:() => shiftDay(1) }, icon('chev', 17));
+  const blockBtn = h('button', { class:'sheet-board day-block-btn', type:'button', title:'Добавить блок времени (например, 10:00–12:00)', onclick:() => { if (dayView && dayView.date) blockEditor(blockBtn, dayView.date, null); } }, icon('clock', 16), 'Блок времени');
   const sheet = h('div', { class:'sheet day-sheet', 'data-key':'week', role:'dialog', 'aria-modal':'true', 'aria-label':'План на день' },
-    h('div', { class:'sheet-top' }, crumbs, h('div', { class:'col-tools' }, prev, next, tool('x', 'Закрыть (Esc)', () => closeDay()))),
+    h('div', { class:'sheet-top' }, crumbs, h('div', { class:'col-tools' }, blockBtn, prev, next, tool('x', 'Закрыть (Esc)', () => closeDay()))),
     h('div', { class:'day-head' }, h('div', { class:'day-titles' }, title, rel), h('div', { class:'prog' }, h('div', { class:'bar' }, bar), n)),
     list, form,
     h('div', { class:'sheet-foot' },
       h('span', {}, h('kbd', {}, '!!!'), ' в конце — срочно: такие задачи видны в колонке «Неделя»'),
-      h('span', {}, 'Перенести на другой день — меню ', h('kbd', {}, '…'), ' у задачи · ', h('kbd', {}, 'Alt+←/→'), ' — соседние дни')));
+      h('span', {}, 'Задачи перетаскиваются мышью · ', h('kbd', {}, 'Alt+←/→'), ' — соседние дни')));
   const ov = h('div', { class:'overlay day-ov', onmousedown:e => { if (e.target === ov) closeDay(); } }, sheet);
   ov.addEventListener('keydown', e => { if (e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) { e.preventDefault(); shiftDay(e.key === 'ArrowLeft' ? -1 : 1); } });
-  bindTaskList(list, () => dayView ? dayView.date : null);
-  dayView = { date:date == null ? null : date, ov, list, input, title, rel, crumbs, bar, n, prev, next };
+  bindTaskList(list);
+  dayView = { date:date == null ? null : date, ov, list, input, title, rel, crumbs, bar, n, prev, next, blockBtn };
   document.body.append(ov);
   renderDayView();
   const f = focusId && list.querySelector('.item[data-id="' + focusId + '"] .txt');
@@ -1107,10 +1401,11 @@ function renderDayView(){
   v.rel.textContent = k == null ? 'Задачи, которые ещё не распределены по дням' : [relDay(k), cap(fmtDate(k, { year:'numeric' }))].filter(Boolean).join(' · ');
   v.crumbs.replaceChildren(h('b', {}, 'Неделя'), h('span', {}, '›'), h('span', {}, k == null ? 'Без даты' : fmtDate(k, { day:'numeric', month:'long', year:'numeric' })));
   v.prev.disabled = v.next.disabled = k == null;
+  v.blockBtn.hidden = k == null;
   const items = dayItems(k);
   v.list.replaceChildren();
-  if (!items.length) v.list.append(h('div', { class:'empty' }, k == null ? 'Задач без даты нет.' : 'На этот день пока ничего нет. Добавьте первое дело ниже.'));
-  items.forEach(t => v.list.append(itemEl(t)));
+  if (!items.length && !dayBlocks(k).length) v.list.append(h('div', { class:'empty' }, k == null ? 'Задач без даты нет.' : 'На этот день пока ничего нет. Добавьте первое дело ниже или разбейте день на блоки времени.'));
+  renderTaskGroups(v.list, k, items);
   v.list.querySelectorAll('textarea').forEach(autosize);
   paintDayProgress();
 }
@@ -1410,12 +1705,17 @@ function addMsg(role, text){
   else { m.append(h('div', { class:'acts-log' }), h('div', { class:'md' })); m.querySelector('.md').innerHTML = mdLite(text); }
   aiMsgs.append(m); aiMsgs.scrollTop = aiMsgs.scrollHeight; return m;
 }
-const ctxTask = t => '[' + t.id + '] ' + (t.done ? '[x]' : '[ ]') + ' ' + (t.pri ? '(приоритет ' + t.pri + (t.pri >= URGENT ? ', срочно' : '') + ') ' : '') + t.text + (t.note.trim() ? ' — заметка: ' + t.note.replace(/\s+/g, ' ').slice(0, 200) : '');
+const ctxTask = (t, k) => {
+  const b = t.block && dayBlocks(k).find(x => x.id === t.block);
+  return '[' + t.id + '] ' + (t.done ? '[x]' : '[ ]') + ' ' + (b ? '{' + b.from + '–' + b.to + '} ' : '') + (t.pri ? '(приоритет ' + t.pri + (t.pri >= URGENT ? ', срочно' : '') + ') ' : '') + t.text + (t.note.trim() ? ' — заметка: ' + t.note.replace(/\s+/g, ' ').slice(0, 200) : '');
+};
+const ctxBlocks = (k, pad) => { const bl = sortedBlocks(k); return bl.length ? pad + 'блоки времени: ' + bl.map(b => '[' + b.id + '] ' + blockLabel(b)).join('; ') + '\n' : ''; };
+const ctxDay = (k, pad) => ctxBlocks(k, pad) + dayItems(k).map(t => pad + ctxTask(t, k)).join('\n');
 function ctxCalendar(){
   const today = todayKey(), from = addDays(today, -7), to = addDays(today, 28), out = [];
   Object.keys(S.cal.days).filter(k => k !== today && k >= from && k <= to).sort().forEach(k => {
     out.push(k + ' (' + fmtDate(k, { weekday:'long', day:'numeric', month:'long' }) + (relDay(k) ? ', ' + relDay(k).toLowerCase() : '') + '):');
-    S.cal.days[k].items.forEach(t => out.push('  ' + ctxTask(t)));
+    out.push(ctxDay(k, '  ').replace(/\n$/, ''));
   });
   const later = Object.keys(S.cal.days).filter(k => k > to).length, earlier = overdueTasks().filter(x => x.date < from).length;
   if (later) out.push('(ещё дней с задачами позже: ' + later + ')');
@@ -1442,14 +1742,16 @@ function buildPrompt(userText){
     'Задачи живут в календаре: у каждой задачи есть день (дата ГГГГ-ММ-ДД) или она «без даты». Колонка «Сегодня» показывает задачи сегодняшней даты, ' +
     'колонка «Неделя» — календарь, где на обзоре видны только срочные задачи. Приоритет задачи: 0 — нет, 1 — низкий, 2 — средний, 3 — срочно. ' +
     'Идентификаторы в квадратных скобках — это id для инструментов. Заметки к задаче короткие. Содержимое страниц смотри через read_page.\n' +
+    'День можно разбить на блоки времени (например, 10:00–12:00 «Работа»): задача в блоке помечена {10:00–12:00}. Блок создаёт add_time_block, ' +
+    'задачу в блок кладут add_task или move_task с параметром block (id блока этого дня). Блоки — необязательная функция: не создавай их без просьбы.\n' +
     'У страниц «Основных планов» и «Идей» есть доски — холст с карточками (заметки, чек-листы, фото, видео, зарисовки, ссылки); непустые доски помечены {доска: …}. ' +
     'Содержимое доски читай через read_board(pageId); добавить заметку или чек-лист на доску — add_board_card. ' +
     'Изображения и зарисовки смотри через look_at_image(cardId) только когда пользователь прямо просит посмотреть, описать или разобрать картинку.\n' +
     (ob ? 'Сейчас у пользователя открыта доска страницы [' + ob.node.id + '] «' + (ob.node.title || 'Без названия') + '».\n' : '') +
     'Сейчас: ' + now + ' (сегодня ' + today + ').\n\n<состояние>\n' +
-    '== СЕГОДНЯ (' + today + ') ==\n' + (dayItems(today).map(ctxTask).join('\n') || '(пусто)') +
+    '== СЕГОДНЯ (' + today + ') ==\n' + (ctxDay(today, '').replace(/\n$/, '') || '(пусто)') +
     '\n\n== КАЛЕНДАРЬ: другие дни с задачами (от недели назад до 4 недель вперёд) ==\n' + ctxCalendar() +
-    '\n\n== БЕЗ ДАТЫ ==\n' + (S.cal.undated.map(ctxTask).join('\n') || '(пусто)') +
+    '\n\n== БЕЗ ДАТЫ ==\n' + (S.cal.undated.map(t => ctxTask(t, null)).join('\n') || '(пусто)') +
     '\n\n== ОСНОВНЫЕ ПЛАНЫ (папки и страницы) ==\n' + ctxTree('plans') +
     '\n\n== ИДЕИ (папки и страницы) ==\n' + ctxTree('ideas') + '\n</состояние>\n\nЗапрос пользователя: ' + userText;
 }
@@ -1465,6 +1767,7 @@ function aiTools(logEl){
     return l.node;
   };
   const taskOrThrow = id => { const loc = findTask(String(id || '')); if (!loc) throw new Error('Task not found: ' + id); return loc; };
+  const blockOrThrow = (date, id) => { const b = dayBlocks(date).find(x => x.id === String(id)); if (!b) throw new Error('Time block ' + id + ' not found on ' + date); return b; };
   const dateArg = v => {
     const s = String(v == null ? 'today' : v).trim().toLowerCase();
     if (!s || s === 'today' || s === 'сегодня') return todayKey();
@@ -1476,10 +1779,18 @@ function aiTools(logEl){
   const T = (name, description, properties, required, fn) => ({ name, description, inputSchema:{ type:'object', properties, required }, execute: async i => fn(i || {}) });
   const DATE = { type:'string', description:'YYYY-MM-DD, "today", "tomorrow" or "none" (no date)' };
   return [
-    T('add_task', 'Add a task to a calendar day. Priority 3 means urgent: urgent tasks are shown in the week overview.', { date:DATE, text:{ type:'string' }, priority:{ type:'integer', minimum:0, maximum:3 }, note:{ type:'string' } }, ['text'], i => {
+    T('add_task', 'Add a task to a calendar day. Priority 3 means urgent: urgent tasks are shown in the week overview. Optional block = id of a time block of that day.', { date:DATE, text:{ type:'string' }, priority:{ type:'integer', minimum:0, maximum:3 }, note:{ type:'string' }, block:{ type:'string' } }, ['text'], i => {
       const date = dateArg(i.date), text = String(i.text || '').trim(); if (!text) throw new Error('text is empty');
       const t = { id:newId(), text:text.slice(0, 500), done:false, pri:Math.min(3, Math.max(0, i.priority | 0)), note:String(i.note || '').slice(0, 1000) };
-      dayItems(date, true).push(t); touch('cal'); refreshCal(); log('plus', 'Добавлено на ' + dayLabel(date) + ': ' + t.text); return { ok:true, id:t.id, date };
+      const b = i.block ? blockOrThrow(date, i.block) : null; if (b) t.block = b.id;
+      dayItems(date, true).push(t); touch('cal'); refreshCal(); log('plus', 'Добавлено на ' + dayLabel(date) + (b ? ' в блок ' + blockLabel(b) : '') + ': ' + t.text); return { ok:true, id:t.id, date };
+    }),
+    T('add_time_block', 'Create a time block for a day (e.g. 10:00-12:00 "Работа"). Times are 24h HH:MM, to must be later than from. Colors: blue, green, yellow, orange, pink, purple. Only when the user asks for blocks.', { date:DATE, from:{ type:'string' }, to:{ type:'string' }, title:{ type:'string' }, color:{ type:'string', enum:BLOCK_COLOR_IDS } }, ['date', 'from', 'to'], i => {
+      const date = dateArg(i.date); if (!date) throw new Error('time blocks need a date');
+      const b = normTimeBlock({ id:newId(), from:String(i.from || '').padStart(5, '0'), to:String(i.to || '').padStart(5, '0'), title:i.title, color:i.color || suggestBlock(date).color });
+      if (!b) throw new Error('from/to must be HH:MM and to must be later than from');
+      const day = S.cal.days[date] || (S.cal.days[date] = { items:[] }); day.blocks = (day.blocks || []).concat([b]);
+      touch('cal'); refreshCal(); log('clock', 'Блок ' + blockLabel(b) + ' на ' + dayLabel(date)); return { ok:true, id:b.id, date };
     }),
     T('update_task', 'Change a task: text, priority 0-3 (3 = urgent), note, done flag.', { id:{ type:'string' }, text:{ type:'string' }, priority:{ type:'integer', minimum:0, maximum:3 }, note:{ type:'string' }, done:{ type:'boolean' } }, ['id'], i => {
       const t = taskOrThrow(i.id).t;
@@ -1489,9 +1800,12 @@ function aiTools(logEl){
       if (typeof i.done === 'boolean') t.done = i.done;
       touch('cal'); refreshCal(); log('check', 'Обновлено: ' + t.text); return { ok:true };
     }),
-    T('move_task', 'Move a task to another day (or "none" to remove the date).', { id:{ type:'string' }, date:DATE }, ['id', 'date'], i => {
+    T('move_task', 'Move a task to another day (or "none" to remove the date). Optional block: id of a time block of the target day, or "none" to take the task out of its block.', { id:{ type:'string' }, date:DATE, block:{ type:'string' } }, ['id', 'date'], i => {
       const loc = taskOrThrow(i.id), date = dateArg(i.date), t = loc.t;
-      if (loc.date !== date) { loc.arr.splice(loc.i, 1); dayItems(date, true).push(t); pruneDays(); touch('cal'); refreshCal(); log('arrow', 'Перенесено на ' + dayLabel(date) + ': ' + t.text); }
+      const b = i.block && i.block !== 'none' ? blockOrThrow(date, i.block) : null;
+      if (loc.date !== date) { loc.arr.splice(loc.i, 1); delete t.block; dayItems(date, true).push(t); pruneDays(); }
+      if (b) t.block = b.id; else if (i.block === 'none') delete t.block;
+      touch('cal'); refreshCal(); log('arrow', 'Перенесено на ' + dayLabel(date) + (b ? ' в блок ' + blockLabel(b) : '') + ': ' + t.text);
       return { ok:true, date };
     }),
     T('delete_task', 'Delete a task. Only when the user explicitly asks.', { id:{ type:'string' } }, ['id'], i => {
