@@ -1,7 +1,7 @@
 {
   "name": "planer-desktop",
-  "version": "1.0.0",
-  "description": "Планер: день, неделя, основные планы и идеи",
+  "version": "2.0.0",
+  "description": "Планер: день, неделя, основные планы, идеи и доски задач",
   "author": "Planer",
   "license": "MIT",
   "private": true,
@@ -24,26 +24,76 @@
   "build": {
     "appId": "local.planer.desktop",
     "productName": "Планер",
+    "executableName": "Planer",
+    "copyright": "© 2026 Planer",
+    "asar": true,
     "files": [
       "main.js",
       "preload.js",
       "shim.js",
       "index.html",
-      "package.json"
+      "lib/**/*.js",
+      "src/**/*.{js,css}",
+      "build/icon.png",
+      "package.json",
+      "!**/*.map"
     ],
     "directories": {
-      "output": "dist"
+      "output": "dist",
+      "buildResources": "build"
     },
     "win": {
-      "target": "nsis"
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "artifactName": "Planer-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Планер",
+      "uninstallDisplayName": "Планер ${version}",
+      "installerLanguages": [
+        "ru_RU",
+        "en_US"
+      ],
+      "language": "1049",
+      "multiLanguageInstaller": true,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "deleteAppDataOnUninstall": false,
+      "artifactName": "Planer-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "Planer-${version}-portable.${ext}"
     },
     "mac": {
       "target": "dmg",
-      "category": "public.app-category.productivity"
+      "category": "public.app-category.productivity",
+      "icon": "build/icon.png",
+      "artifactName": "Planer-${version}.${ext}"
     },
     "linux": {
       "target": "AppImage",
-      "category": "Office"
+      "category": "Office",
+      "icon": "build/icon.png",
+      "artifactName": "Planer-${version}.${ext}"
     }
   }
 }
