@@ -12,6 +12,8 @@
 .bd-ov{position:fixed;inset:0;z-index:60;background:rgba(20,18,14,.45);display:grid;place-items:center;padding:16px}
 .bd-sheet{--accent:var(--c-day);width:min(1560px,100%);height:min(94vh,1120px);height:min(94dvh,1120px);background:var(--panel);border:1px solid var(--line);border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.3);display:flex;flex-direction:column;overflow:hidden}
 .bd-sheet[data-key=week]{--accent:var(--c-week)}
+.bd-sheet[data-key=plans]{--accent:var(--c-plans)}
+.bd-sheet[data-key=ideas]{--accent:var(--c-ideas)}
 .bd-top{display:flex;align-items:center;gap:8px;padding:8px 10px 8px 16px;border-bottom:1px solid var(--line);min-height:54px}
 .bd-crumb{display:flex;align-items:center;gap:6px;color:var(--accent);font-weight:650;font-size:12.5px;white-space:nowrap;flex:none}
 .bd-title{flex:1;min-width:100px;border:0;outline:0;background:transparent;font-size:17px;font-weight:650;letter-spacing:-.01em;padding:5px 8px;border-radius:9px;text-overflow:ellipsis}

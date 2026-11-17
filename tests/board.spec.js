@@ -1,11 +1,11 @@
-// Сквозной сценарий доски: задача → доска → заметка, фото, видео, зарисовка → перемещение, размер,
+// Сквозной сценарий доски: страница «Основных планов» → доска → заметка, фото, видео, зарисовка → перемещение, размер,
 // отмена/повтор, удаление → перезапуск приложения → данные на месте.
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 const fs = require('fs');
-const { fx, tmpDataDir, rmDir, launch, closeApp, addTask, openBoard, boardDoc, waitBoard, vpPoint, toastText, clickCard } = require('./helpers');
+const { fx, tmpDataDir, rmDir, launch, closeApp, addPage, openBoard, boardDoc, waitBoard, vpPoint, toastText, clickCard } = require('./helpers');
 
-test.describe.serial('Доска задачи', () => {
+test.describe.serial('Доска страницы', () => {
   let dataDir, app, page, errors, taskId;
   const cards = () => page.locator('.bd-card');
   const itemsOf = async () => ((await boardDoc(page, taskId)) || { items: [] }).items;
@@ -13,11 +13,11 @@ test.describe.serial('Доска задачи', () => {
   test.beforeAll(() => { dataDir = tmpDataDir('board'); });
   test.afterAll(async () => { await closeApp(app); rmDir(dataDir); });
 
-  test('главный экран открывается, задача создаётся', async () => {
+  test('главный экран открывается, страница создаётся', async () => {
     ({ app, page, errors } = await launch(dataDir, { size: [1440, 900] }));
     await expect(page.locator('.col')).toHaveCount(4);
     await expect(page.locator('#status')).toHaveText('Сохранено');
-    taskId = await addTask(page, 'day', 'Подготовить презентацию');
+    taskId = await addPage(page, 'plans', 'Подготовить презентацию');
     expect(taskId).toBeTruthy();
   });
 
@@ -85,7 +85,7 @@ test.describe.serial('Доска задачи', () => {
     const st = await page.locator('.sk-stage').boundingBox();
     await page.mouse.move(st.x + st.width * 0.3, st.y + st.height * 0.5);
     await page.mouse.down();
-    for (let i = 1; i <= 30; i++) await page.mouse.move(st.x + st.width * (0.3 + i * 0.01), st.y + st.height * (0.5 + Math.sin(i / 4) * 0.1));
+    for (let i = 1; i <= 30; i++) await page.mouse.move(st.x + st.width * (0.3 + i * 0.01), st.y + st.height * 0.5);
     await page.mouse.up();
     await page.keyboard.press('Escape');
     await expect(page.locator('.sk-ov')).toHaveCount(0);
@@ -94,7 +94,7 @@ test.describe.serial('Доска задачи', () => {
     expect(s1.strokesId).toMatch(/^[a-f0-9]{64}$/);
     const v1 = JSON.parse(await page.evaluate(id => window.electronAPI.media.getVector(id), s1.strokesId));
     expect(v1.strokes).toHaveLength(1);
-    expect(v1.strokes[0].pts.length).toBeLessThan(31 * 3 + 6);            // точки прорежены
+    expect(v1.strokes[0].pts.length / 3).toBeLessThanOrEqual(4);          // прямой штрих из 30 движений прорежен до 2–4 точек
     const skImg = page.locator('.bd-card.t-sketch img.bd-img');
     await expect.poll(() => skImg.evaluate(i => i.complete && i.naturalWidth)).toBeGreaterThan(0);
 
@@ -257,16 +257,16 @@ test.describe.serial('Доска задачи', () => {
     expect((await itemsOf()).length).toBe(n0);
   });
 
-  test('задача показывает число карточек; данные переживают перезапуск', async () => {
+  test('страница показывает число карточек; данные переживают перезапуск', async () => {
     const items = await itemsOf();
     await page.keyboard.press('Escape');
     await page.keyboard.press('Escape');
     await expect(page.locator('.bd-sheet')).toHaveCount(0);
-    await expect(page.locator('.item[data-id="' + taskId + '"] .board-btn .bc')).toHaveText(String(items.length));
+    await expect(page.locator('.node[data-id="' + taskId + '"] .n-board .bc')).toHaveText(String(items.length));
     expect(errors.filter(e => !/Autofill|DevTools/.test(e))).toEqual([]);
     await closeApp(app);
     ({ app, page, errors } = await launch(dataDir, { size: [1440, 900] }));
-    await expect(page.locator('.item[data-id="' + taskId + '"] .board-btn .bc')).toHaveText(String(items.length));
+    await expect(page.locator('.node[data-id="' + taskId + '"] .n-board .bc')).toHaveText(String(items.length));
     await openBoard(page, taskId);
     await expect(cards()).toHaveCount(items.length);
     await page.click('.bd-zoom .bd-zb[aria-label^="Показать всё"]');
@@ -310,7 +310,7 @@ test('видео, которое не воспроизводится: понят
   fs.writeFileSync(bad, Buffer.concat([head, Buffer.alloc(4096, 7)]));
   const { app, page } = await launch(dir, { size: [1280, 800] });
   try {
-    const id = await addTask(page, 'day', 'Видео');
+    const id = await addPage(page, 'plans', 'Видео');
     await openBoard(page, id);
     await page.setInputFiles('.bd-file', bad);
     const card = page.locator('.bd-card.t-video');

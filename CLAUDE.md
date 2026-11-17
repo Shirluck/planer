@@ -1,6 +1,6 @@
 # Планер (десктоп, Electron)
 
-Личный планировщик: 4 колонки (Сегодня, Неделя, Основные планы, Идеи) + ИИ-ассистент + доска внутри каждой задачи
+Личный планировщик: 4 колонки (Сегодня, Неделя-календарь, Основные планы, Идеи) + ИИ-ассистент + доска у каждой страницы планов и идей
 (холст в стиле Milanote: заметки, чек-листы, фото, видео, зарисовки, ссылки). Интерфейс на русском.
 
 ## Файлы
@@ -21,9 +21,14 @@
 - `lib/media.js` — медиа `media/<sha256>.<ext>`, проверка сигнатур, миниатюры, векторы зарисовок, схема `media://<id>[/thumb]` с Range, сборка мусора.
 
 ## Данные
-- Разделы `day`/`week`: `{ items: [{id, text, done, pri 0..3, note, boardCount}], hideDone }`.
-- Разделы `plans`/`ideas`: `{ nodes: [папка {id,type:'folder',title,open,children} | страница {id,type:'page',title,blocks:[{id,t,text,done}]}] }`.
-- Доска: документ `board-<taskId>` = `{ v:1, view:{x,y,zoom}, items:[{id,type,x,y,w,h,z,…}] }`; типы `note|checklist|image|video|sketch|link`.
+- Колонки `day` («Сегодня») и `week` («Неделя»-календарь) — это виды одного документа `cal` (`planner-cal`):
+  `{ v:1, days:{ 'ГГГГ-ММ-ДД': { items:[{id, text, done, pri 0..3, note}] } }, undated:[…], hideDone, urgentOnly, showCal }`.
+  Срочно = `pri 3` (`URGENT`): только такие задачи видны в обзоре недели. Пустые дни удаляются (`pruneDays`).
+  Задачу ищет `findTask(id)` → `{date, arr, i, t}` (`date` null = «Без даты»); изменения → `touch('cal')` + `refreshCal()`.
+  Старые `planner-day`/`planner-week` переносит `migrateLegacy()` (один раз, если `planner-cal` ещё нет): day → сегодня, week → undated.
+- Разделы `plans`/`ideas`: `{ nodes: [папка {id,type:'folder',title,open,children} | страница {id,type:'page',title,blocks:[{id,t,text,done}], boardCount?, boardId?}] }`.
+- Доска принадлежит странице: документ `board-<boardId || id страницы>` = `{ v:1, view:{x,y,zoom}, items:[{id,type,x,y,w,h,z,…}] }`;
+  типы `note|checklist|image|video|sketch|link`. В board.js «taskId» — это ключ доски (см. `ownerKey`, `findOwner` в index.html).
   Медиа только ссылкой (`mediaId` = sha256), никакого base64. Зарисовка: `mediaId` (PNG) + `strokesId` (векторы); рисунок поверх фото — `overlay`.
 - На диске: `%APPDATA%\Planer\` (`docs/`, `media/`, `backups/`, `planer-meta.json`, `api-key.bin`). `PLANER_DATA_DIR` — другая папка (тесты).
 - Любое изменение раздела: изменить `S[k]`, вызвать `touch(k)`, затем `refreshSection(k)`. На доске — через `change()` или `scheduleSave()`.

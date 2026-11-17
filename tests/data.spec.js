@@ -2,41 +2,58 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 const fs = require('fs');
-const { fx, tmpDataDir, rmDir, launch, closeApp, openBoard } = require('./helpers');
+const { fx, tmpDataDir, rmDir, launch, closeApp, openBoard, addPage } = require('./helpers');
 
 const legacy = {
-  'data/users/local/planner-day': { items: [{ id: 't1', text: 'Старая задача', done: false, pri: 3, note: 'заметка из v1' }, { id: 't2', text: 'Сделано', done: true, pri: 0, note: '' }], hideDone: false },
+  'data/users/local/planner-day': { items: [{ id: 't1', text: 'Старая задача', done: false, pri: 3, note: 'заметка из v1', boardCount: 2 }, { id: 't2', text: 'Сделано', done: true, pri: 0, note: '' }], hideDone: false },
   'data/users/local/planner-week': { items: [{ id: 't3', text: 'Задача недели', done: false, pri: 1, note: '' }], hideDone: false },
   'data/users/local/planner-plans': { nodes: [{ id: 'f1', type: 'folder', title: 'Работа', open: true, children: [{ id: 'p1', type: 'page', title: 'План', blocks: [{ id: 'b1', t: 'todo', text: 'Пункт', done: true }] }] }] },
-  'data/users/local/planner-ideas': { nodes: [] }
+  'data/users/local/planner-ideas': { nodes: [] },
+  'data/users/local/board-t1': { v: 1, view: { x: 0, y: 0, zoom: 1 }, items: [
+    { id: 'n1', type: 'note', x: 0, y: 0, w: 240, h: 80, z: 1, text: 'Заметка со старой доски' },
+    { id: 'n2', type: 'checklist', x: 300, y: 0, w: 260, h: 90, z: 2, title: 'Список', items: [{ id: 'i1', text: 'Пункт', done: false }] }] }
 };
+const today = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
 
 test('миграция старого planner-data.json без потерь и с копией', async () => {
   const dir = tmpDataDir('migrate');
   fs.writeFileSync(path.join(dir, 'planner-data.json'), JSON.stringify(legacy));
   const { app, page, errors } = await launch(dir);
   try {
+    // «Сегодня» версии 1 → задачи на сегодняшнюю дату
     await expect(page.locator('.col[data-key=day] .item')).toHaveCount(2);
     await expect(page.locator('.col[data-key=day] .item').first().locator('.txt')).toHaveValue('Старая задача');
     await expect(page.locator('.col[data-key=day] .item').first()).toHaveAttribute('data-pri', '3');
     await expect(page.locator('.col[data-key=day] .note-prev').first()).toHaveText('заметка из v1');
-    await expect(page.locator('.col[data-key=week] .item .txt')).toHaveValue('Задача недели');
-    await expect(page.locator('.col[data-key=plans] .node.page .n-title')).toHaveText('План');
+    // «Неделя» версии 1 → «Без даты» в календаре
+    await expect(page.locator('.col[data-key=week] .wk-day.undated .wk-task .wk-t')).toHaveText('Задача недели');
+    await expect(page.locator('.col[data-key=plans] .node.page .n-title', { hasText: 'План' })).toBeVisible();
+    // доска старой задачи → страница в «Основных планах» → «Доски задач», карточки на месте
+    const pg = page.locator('.col[data-key=plans] .node.page', { hasText: 'Старая задача' });
+    await expect(pg.locator('.n-board .bc')).toHaveText('2');
+    await pg.hover(); await pg.locator('.n-board').click();
+    await expect(page.locator('.bd-card')).toHaveCount(2);
+    await expect(page.locator('.bd-card.t-note')).toContainText('Заметка со старой доски');
+    await page.keyboard.press('Escape');
     const meta = JSON.parse(fs.readFileSync(path.join(dir, 'planer-meta.json'), 'utf8'));
     expect(meta.schema).toBe(2);
     expect(fs.readdirSync(path.join(dir, 'backups')).some(f => /^planner-data-before-schema-2-.*\.json$/.test(f))).toBe(true);
-    expect(fs.existsSync(path.join(dir, 'docs', 'data__users__local__planner-day.json'))).toBe(true);
-    expect(fs.existsSync(path.join(dir, 'planner-data.json'))).toBe(true);           // старый файл не удалён
+    expect(fs.existsSync(path.join(dir, 'docs', 'data__users__local__planner-day.json'))).toBe(true);   // старые документы не удалены
+    expect(fs.existsSync(path.join(dir, 'planner-data.json'))).toBe(true);
+    await expect(page.locator('#status')).toHaveText('Сохранено');
     expect(errors).toEqual([]);
   } finally { await closeApp(app); }
-  // после миграции изменения пишутся в docs и не теряются при перезапуске
+  // после миграции изменения пишутся в planner-cal и не теряются; повторной миграции нет
   const r2 = await launch(dir);
   try {
+    await expect(r2.page.locator('.col[data-key=day] .item')).toHaveCount(2);
+    await expect(r2.page.locator('.col[data-key=plans] .node.page', { hasText: 'Старая задача' })).toHaveCount(1);
     await r2.page.locator('.col[data-key=day] .item').first().locator('.cb').click();
     await expect(r2.page.locator('#status')).toHaveText('Сохранено');
   } finally { await closeApp(r2.app); }
-  const day = JSON.parse(fs.readFileSync(path.join(dir, 'docs', 'data__users__local__planner-day.json'), 'utf8'));
-  expect(day.items[0].done).toBe(true);
+  const cal = JSON.parse(fs.readFileSync(path.join(dir, 'docs', 'data__users__local__planner-cal.json'), 'utf8'));
+  expect(cal.days[today()].items[0].done).toBe(true);
+  expect(cal.undated.map(t => t.text)).toEqual(['Задача недели']);
   rmDir(dir);
 });
 
@@ -46,6 +63,7 @@ test('повреждённый и пустой файлы данных: прил
   fs.writeFileSync(path.join(dir, 'planer-meta.json'), JSON.stringify({ schema: 2 }));
   fs.writeFileSync(path.join(dir, 'docs', 'data__users__local__planner-day.json'), '{"items":[{"id":"x", "text": обрыв');
   fs.writeFileSync(path.join(dir, 'docs', 'data__users__local__planner-week.json'), '');
+  fs.writeFileSync(path.join(dir, 'docs', 'data__users__local__planner-cal.json'), '{"days": {"2026-');
   const { app, page } = await launch(dir);
   try {
     await expect(page.locator('.col')).toHaveCount(4);
@@ -53,6 +71,7 @@ test('повреждённый и пустой файлы данных: прил
     const files = fs.readdirSync(path.join(dir, 'docs'));
     expect(files.some(f => f.startsWith('data__users__local__planner-day.json.corrupt-'))).toBe(true);
     expect(files.some(f => f.startsWith('data__users__local__planner-week.json.corrupt-'))).toBe(true);
+    expect(files.some(f => f.startsWith('data__users__local__planner-cal.json.corrupt-'))).toBe(true);
     await page.fill('.col[data-key=day] .add-input', 'Новая задача после сбоя');
     await page.press('.col[data-key=day] .add-input', 'Enter');
     await expect(page.locator('#status')).toHaveText('Сохранено');
@@ -102,9 +121,7 @@ test('большие файлы: прогресс копирования и пр
   fs.writeFileSync(big, Buffer.alloc(3 * 1024 * 1024));
   const { app, page } = await launch(dir, { env: { PLANER_MAX_MEDIA_BYTES: String(2 * 1024 * 1024), PLANER_PROGRESS_MIN_BYTES: String(200 * 1024) } });
   try {
-    await page.fill('.col[data-key=day] .add-input', 'Видео');
-    await page.press('.col[data-key=day] .add-input', 'Enter');
-    const id = await page.locator('.col[data-key=day] .item').first().getAttribute('data-id');
+    const id = await addPage(page, 'plans', 'Видео');
     await openBoard(page, id);
     await page.evaluate(() => { window.__prog = []; window.electronAPI.media.onProgress(p => window.__prog.push(p)); });
     await page.setInputFiles('.bd-file', big);

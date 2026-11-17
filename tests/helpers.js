@@ -32,19 +32,40 @@ async function setSize(app, w, h) {
 }
 async function closeApp(app) { if (app) { try { await app.close(); } catch (_) {} } }
 
+// Задача на сегодня (колонка «Сегодня») или в открытом окне дня (k = 'sheet').
 async function addTask(page, k, text) {
-  const inp = page.locator('.col[data-key=' + k + '] .add-input');
+  const scope = k === 'sheet' ? '.day-sheet' : '.col[data-key=' + k + ']';
+  const inp = page.locator(scope + ' .add-input');
   await inp.fill(text);
   await inp.press('Enter');
-  const item = page.locator('.col[data-key=' + k + '] .item', { has: page.locator('textarea.txt') }).last();
+  const item = page.locator(scope + ' .item', { has: page.locator('textarea.txt') }).last();
   await expect(item).toBeVisible();
   return item.getAttribute('data-id');
 }
-async function openBoard(page, taskId) {
-  const item = page.locator('.item[data-id="' + taskId + '"]');
-  await item.hover();
-  await item.locator('.board-btn').click();
+// Новая страница в «Основных планах» или «Идеях»; редактор страницы закрывается.
+async function addPage(page, k, title) {
+  await page.locator('.col[data-key=' + k + '] .tool[aria-label="Новая страница"]').click();
+  await expect(page.locator('.sheet .title-in')).toBeFocused();
+  await page.keyboard.type(title);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.sheet .title-in')).toHaveCount(0);
+  const row = page.locator('.col[data-key=' + k + '] .node.page', { hasText: title }).last();
+  await expect(row).toBeVisible();
+  return row.getAttribute('data-id');
+}
+// Доска страницы: значок в строке страницы.
+async function openBoard(page, pageId) {
+  const row = page.locator('.node[data-id="' + pageId + '"]');
+  await row.hover();
+  await row.locator('.n-board').click();
   await expect(page.locator('.bd-sheet')).toBeVisible();
+}
+const isoDay = (offset = 0) => { const d = new Date(); d.setDate(d.getDate() + offset); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+const calDoc = page => page.evaluate(p => window.electronAPI.dbGet(p), DOC('planner-cal'));
+async function waitCal(page, pred, msg) {
+  let last = null;
+  await expect.poll(async () => { last = await calDoc(page); return !!(last && pred(last)); }, { message: msg || 'calendar doc', timeout: 15000 }).toBe(true);
+  return last;
 }
 const boardDoc = (page, taskId) => page.evaluate(p => window.electronAPI.dbGet(p), DOC('board-' + taskId));
 async function waitBoard(page, taskId, pred, msg) {
@@ -82,4 +103,4 @@ async function toastText(page) {
   return t.textContent();
 }
 
-module.exports = { ROOT, FIX, fx, DOC, tmpDataDir, rmDir, launch, setSize, closeApp, addTask, openBoard, boardDoc, waitBoard, vpPoint, toastText, clickCard };
+module.exports = { ROOT, FIX, fx, DOC, tmpDataDir, rmDir, launch, setSize, closeApp, addTask, addPage, openBoard, boardDoc, waitBoard, vpPoint, toastText, clickCard, isoDay, calDoc, waitCal };

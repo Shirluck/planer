@@ -3,7 +3,7 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 const fs = require('fs');
-const { ROOT, fx, tmpDataDir, rmDir, launch, closeApp, addTask, openBoard, waitBoard, vpPoint } = require('./helpers');
+const { ROOT, fx, tmpDataDir, rmDir, launch, closeApp, addTask, addPage, openBoard, waitBoard, vpPoint, waitCal, isoDay } = require('./helpers');
 
 const exe = process.env.PLANER_EXE || path.join(ROOT, 'dist', 'win-unpacked', process.platform === 'win32' ? 'Planer.exe' : 'planer');
 
@@ -18,7 +18,9 @@ test('собранное приложение: запуск, доска, мед�
     expect(info.version).toBe(require(path.join(ROOT, 'package.json')).version);
     expect(info.appPath).toMatch(/app\.asar$/);
     expect(await page.evaluate(() => window.electronAPI.appInfo().then(i => i.version))).toBe(info.version);
-    taskId = await addTask(page, 'day', 'Проверка сборки');
+    await addTask(page, 'day', 'Задача из сборки !!!');
+    await waitCal(page, c => c.days[isoDay(0)] && c.days[isoDay(0)].items.length === 1);
+    taskId = await addPage(page, 'plans', 'Проверка сборки');
     await openBoard(page, taskId);
     const p = await vpPoint(page, 0.3, 0.3);
     await page.mouse.dblclick(p.x, p.y);
@@ -40,7 +42,9 @@ test('собранное приложение: запуск, доска, мед�
 
   ({ app, page, errors } = await launch(dir, { executablePath: exe, size: [1280, 800] }));
   try {
-    await expect(page.locator('.item[data-id="' + taskId + '"] .board-btn .bc')).toHaveText('4');
+    await expect(page.locator('.col[data-key=day] .item .txt')).toHaveValue('Задача из сборки');
+    await expect(page.locator('.col[data-key=week] .wk-day.today .wk-task')).toHaveText('Задача из сборки');
+    await expect(page.locator('.node[data-id="' + taskId + '"] .n-board .bc')).toHaveText('4');
     await openBoard(page, taskId);
     await page.click('.bd-zoom .bd-zb[aria-label^="Показать всё"]');
     await expect(page.locator('.bd-card')).toHaveCount(4);

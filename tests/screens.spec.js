@@ -3,7 +3,7 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 const fs = require('fs');
-const { fx, DOC, tmpDataDir, rmDir, launch, setSize, closeApp, addTask, openBoard, waitBoard, vpPoint, clickCard } = require('./helpers');
+const { fx, DOC, tmpDataDir, rmDir, launch, setSize, closeApp, addTask, addPage, openBoard, waitBoard, vpPoint, clickCard } = require('./helpers');
 
 const OUT = path.join(__dirname, 'screens');
 
@@ -20,13 +20,34 @@ test.describe.serial('Скриншоты', () => {
   test.afterAll(async () => { await closeApp(app); rmDir(dir); });
 
   test('главный экран', async () => {
-    taskId = await addTask(page, 'day', 'Подготовить презентацию для клиента !!');
+    await addTask(page, 'day', 'Подготовить презентацию для клиента !!!');
     await addTask(page, 'day', 'Позвонить в типографию');
     await addTask(page, 'day', 'Купить фасады для кухни !');
-    await addTask(page, 'week', 'Ремонт кухни: выбрать плитку');
-    await addTask(page, 'week', 'Отпуск: билеты и отель !!!');
     await page.locator('.col[data-key=day] .item').nth(1).locator('.cb').click();
-    // наполнить доску
+    // расписать другие дни недели через окно дня
+    const days = (await page.locator('.col[data-key=week] .wk-day').evaluateAll(els => els.map(e => e.dataset.date))).filter(Boolean);
+    const todayK = await page.locator('.col[data-key=week] .wk-day.today').getAttribute('data-date');
+    const others = days.filter(k => k !== todayK);
+    const plan = [['Встреча с подрядчиком !!!', 'Выбрать плитку для кухни', 'Забрать заказ'], ['Отпуск: купить билеты !!!', 'Тренировка'], ['Сдать квартальный отчёт !!!']];
+    for (let i = 0; i < plan.length; i++) {
+      await page.locator('.col[data-key=week] .wk-day[data-date="' + others[i] + '"] .wk-head').click();
+      for (const t of plan[i]) await addTask(page, 'sheet', t);
+      if (i === 0) {
+        await shot('day-sheet-light-1280x800');
+        await scheme('dark'); await shot('day-sheet-dark-1280x800'); await scheme('light');
+      }
+      await page.keyboard.press('Escape');
+    }
+    // выбор дня для переноса
+    const it = page.locator('.col[data-key=day] .item').nth(2);
+    await it.hover(); await it.locator('.more').click();
+    await shot('task-menu-light');
+    await page.click('.menu-it:has-text("Перенести на другой день")');
+    await shot('date-picker-light');
+    await page.keyboard.press('Escape');
+    // страница с доской в «Основных планах»
+    taskId = await addPage(page, 'plans', 'Презентация для клиента');
+    await addPage(page, 'ideas', 'Кухня мечты');
     await openBoard(page, taskId);
     const p = await vpPoint(page, 0.18, 0.2);
     await page.mouse.dblclick(p.x, p.y);
@@ -78,7 +99,7 @@ test.describe.serial('Скриншоты', () => {
     await page.keyboard.press('Escape');
     await expect(page.locator('.bd-sheet')).toHaveCount(0);
 
-    await page.locator('.item[data-id="' + taskId + '"] .txt').hover();
+    await page.locator('.node[data-id="' + taskId + '"]').hover();
     await shot('main-light-1280x800');
     await scheme('dark'); await shot('main-dark-1280x800'); await scheme('light');
     await setSize(app, 1920, 1080); await shot('main-light-1920x1080');
@@ -119,8 +140,8 @@ test.describe.serial('Скриншоты', () => {
     await page.keyboard.press('Escape');
     // пустая доска
     await page.keyboard.press('Escape');
-    const t2 = page.locator('.col[data-key=week] .item').first();
-    await t2.hover(); await t2.locator('.board-btn').click();
+    const t2 = page.locator('.col[data-key=ideas] .node.page').first();
+    await t2.hover(); await t2.locator('.n-board').click();
     await shot('board-empty-light');
     await scheme('dark'); await shot('board-empty-dark'); await scheme('light');
     await page.keyboard.press('Escape');
@@ -129,7 +150,7 @@ test.describe.serial('Скриншоты', () => {
   test('плавность: 150 карточек', async () => {
     const r = await page.evaluate(async b => window.electronAPI.media.importBuffer('photo.png', 'image/png', new Uint8Array(b)), [...fs.readFileSync(fx('photo.png'))]);
     const id = r.meta.id;
-    const tid = await addTask(page, 'week', 'Мудборд на 150 карточек');
+    const tid = await addPage(page, 'ideas', 'Мудборд на 150 карточек');
     const items = [];
     for (let i = 0; i < 150; i++) {
       const x = (i % 15) * 280, y = Math.floor(i / 15) * 230;

@@ -1,4 +1,4 @@
-/* Доска задачи — свободный холст в стиле Milanote.
+/* Доска страницы («Основные планы», «Идеи») — свободный холст в стиле Milanote.
    Карточки: заметка, чек-лист, изображение, видео, зарисовка, ссылка. DOM + CSS transform, без библиотек.
    Подключается из index.html: const board = PlanerBoard.create(ctx). Медиа — только по ссылке media://<sha256>. */
 (function () {
@@ -374,8 +374,8 @@ function create(ctx) {
     return h('button', { class: 'tool' + (cls ? ' ' + cls : ''), type: 'button', 'aria-label': label, title: label, onclick: run }, icon(ic, 17));
   }
   function buildUi(task) {
-    const k = ctx.taskSection(B.taskId) || 'day';
-    B.titleIn = h('input', { class: 'bd-title', type: 'text', maxlength: '500', 'aria-label': 'Название задачи', placeholder: 'Без названия' });
+    const k = ctx.taskSection(B.taskId) || 'plans';
+    B.titleIn = h('input', { class: 'bd-title', type: 'text', maxlength: '500', 'aria-label': 'Название страницы', placeholder: 'Без названия' });
     B.titleIn.value = task.text;
     B.titleIn.addEventListener('input', () => { const v = B.titleIn.value; if (v.trim()) ctx.setTaskText(B.taskId, v); });
     B.titleIn.addEventListener('blur', () => { if (!B) return; if (!B.titleIn.value.trim()) { const t = ctx.getTask(B.taskId); B.titleIn.value = t ? t.text : ''; } });
@@ -411,7 +411,7 @@ function create(ctx) {
       railBtn('brush', 'Зарисовка', () => newSketch()),
       railBtn('link', 'Ссылка', () => addLinkDraft()),
       B.fileIn);
-    B.sheet = h('div', { class: 'bd-sheet', 'data-key': k, role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Доска задачи' },
+    B.sheet = h('div', { class: 'bd-sheet', 'data-key': k, role: 'dialog', 'aria-modal': 'true', 'aria-label': 'Доска страницы' },
       h('header', { class: 'bd-top' },
         h('span', { class: 'bd-crumb' }, icon('board', 16), ctx.sectionTitle(k)),
         B.titleIn,

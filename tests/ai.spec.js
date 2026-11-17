@@ -1,14 +1,14 @@
-// Ассистент и доски: read_board, look_at_image (картинка уходит блоком image, JPEG ≤ 1568 px), add_board_card.
+// Ассистент: доски страниц (read_board, add_board_card, look_at_image — картинка уходит блоком image, JPEG ≤ 1568 px) и задачи по датам (add_task).
 // Сеть не используется: обработчик запросов к API подменяется в основном процессе сценарием.
 const { test, expect } = require('@playwright/test');
 const sharp = require('sharp');
-const { fx, tmpDataDir, rmDir, launch, closeApp, addTask, openBoard, waitBoard, vpPoint } = require('./helpers');
+const { fx, tmpDataDir, rmDir, launch, closeApp, addPage, openBoard, waitBoard, vpPoint, isoDay, waitCal } = require('./helpers');
 
 test('ассистент читает доску, смотрит картинку и добавляет чек-лист', async () => {
   const dir = tmpDataDir('ai');
   const { app, page } = await launch(dir, { size: [1440, 900] });
   try {
-    const taskId = await addTask(page, 'week', 'Ремонт кухни');
+    const taskId = await addPage(page, 'ideas', 'Ремонт кухни');
     await openBoard(page, taskId);
     const p = await vpPoint(page, 0.35, 0.35);
     await page.mouse.dblclick(p.x, p.y);
@@ -27,13 +27,14 @@ test('ассистент читает доску, смотрит картинк�
         globalThis.__reqs.push(JSON.parse(JSON.stringify(body)));
         const n = globalThis.__reqs.length;
         const use = (id, name, input) => ({ ok: true, status: 200, data: { stop_reason: 'tool_use', content: [{ type: 'tool_use', id, name, input }] } });
-        if (n === 1) return use('t1', 'read_board', { taskId });
+        if (n === 1) return use('t1', 'read_board', { pageId: taskId });
         if (n === 2) {
           const last = body.messages[body.messages.length - 1].content[0].content;
           const card = JSON.parse(last).cards.find(c => c.type === 'image');
           return use('t2', 'look_at_image', { cardId: card.id });
         }
-        if (n === 3) return use('t3', 'add_board_card', { taskId, type: 'checklist', text: 'Что купить\n[ ] Фасады\n[x] Смеситель' });
+        if (n === 3) return use('t3', 'add_board_card', { pageId: taskId, type: 'checklist', text: 'Что купить\n[ ] Фасады\n[x] Смеситель' });
+        if (n === 4) return use('t4', 'add_task', { date: 'tomorrow', text: 'Заказать фасады', priority: 3 });
         return { ok: true, status: 200, data: { stop_reason: 'end_turn', content: [{ type: 'text', text: 'На фото горы и солнце. Добавил чек-лист.' }] } };
       });
     }, taskId);
@@ -47,11 +48,16 @@ test('ассистент читает доску, смотрит картинк�
     await expect(page.locator('.act img.act-thumb')).toHaveCount(1);
 
     const reqs = await app.evaluate(() => globalThis.__reqs);
-    expect(reqs).toHaveLength(4);
+    expect(reqs).toHaveLength(5);
     const prompt = reqs[0].messages[reqs[0].messages.length - 1].content;
     expect(prompt).toContain('read_board');
     expect(prompt).toContain('{доска: карточек 2}');
-    expect(reqs[0].tools.map(t => t.name)).toEqual(expect.arrayContaining(['read_board', 'add_board_card', 'look_at_image']));
+    expect(prompt).toContain('== КАЛЕНДАРЬ');
+    expect(reqs[0].tools.map(t => t.name)).toEqual(expect.arrayContaining(['read_board', 'add_board_card', 'look_at_image', 'add_task', 'move_task']));
+    // задача от ассистента легла на завтрашнюю дату и стала срочной
+    const cal = await waitCal(page, c => c.days[isoDay(1)] && c.days[isoDay(1)].items.some(t => t.text === 'Заказать фасады'));
+    expect(cal.days[isoDay(1)].items.find(t => t.text === 'Заказать фасады').pri).toBe(3);
+    await expect(page.locator('.act', { hasText: 'Добавлено на завтра' })).toHaveCount(1);
     // третий запрос несёт результат look_at_image с блоком image
     const tr = reqs[2].messages[reqs[2].messages.length - 1].content[0];
     expect(tr.type).toBe('tool_result');
@@ -71,6 +77,6 @@ test('ассистент читает доску, смотрит картинк�
       const overlap = cl.x < r.x + r.w && r.x < cl.x + cl.w && cl.y < r.y + r.h && r.y < cl.y + 120;
       expect(overlap).toBe(false);
     }
-    await expect(page.locator('.item[data-id="' + taskId + '"] .board-btn .bc')).toHaveText('3');
+    await expect(page.locator('.node[data-id="' + taskId + '"] .n-board .bc')).toHaveText('3');
   } finally { await closeApp(app); rmDir(dir); }
 });

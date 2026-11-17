@@ -25,13 +25,13 @@ test('задачи, страницы и папки работают как ра�
     await expect(items.nth(1)).toHaveClass(/has-note/);
     await page.locator('.col[data-key=day] .tool[aria-label="Отсортировать по приоритету"]').click();
     await expect(items.nth(0).locator('.txt')).toHaveValue('Срочная');
-    // перенос в неделю через меню и обратно отменой
+    // перенос на завтра через меню и обратно отменой
     await items.nth(0).hover();
     await items.nth(0).locator('.more').click();
-    await page.click('.menu-it:has-text("Перенести в неделю")');
-    await expect(page.locator('.col[data-key=week] .item .txt')).toHaveValue('Срочная');
+    await page.click('.menu-it:has-text("Перенести на завтра")');
+    await expect(items).toHaveCount(1);                       // задача ушла на завтра
     await page.click('.toast button');
-    await expect(page.locator('.col[data-key=week] .item')).toHaveCount(0);
+    await expect(items).toHaveCount(2);
     // удаление с отменой
     await items.nth(1).hover();
     await items.nth(1).locator('.more').click();
