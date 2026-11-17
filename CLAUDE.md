@@ -14,9 +14,15 @@
   История отмены — снимки JSON массива `items` (100 шагов, на задачу, живёт сессию). `change(fn)` = изменение с записью в историю.
 - `src/sketch.js` — редактор зарисовок `PlanerSketch.open(opts)` → Promise; общие `drawStrokes`, `drawBackground`.
 - `src/board.css` — стили доски и редактора (только токены из `index.html`).
-- `shim.js` — `window.claude.use('db' | 'user' | 'sample')` поверх Electron; инструмент может вернуть `{ __content: [блоки] }` (картинка для модели).
+- `shim.js` — `window.claude.use('db' | 'user' | 'sample' | 'assistant')` поверх Electron; инструмент может вернуть `{ __content: [блоки] }` (картинка для модели).
+  `sample` в режиме `claude-code` (`sampleClaudeCode`): каждый шаг — новый запуск Claude Code, весь ход работы одним сообщением,
+  ответ модели — JSON `{reply, tool_calls}`; в режиме `api` — обычный tool use через `anthropic` IPC. Здесь же окно «Ассистент: подключение».
+- `lib/claudecode.js` — поиск `claude.exe` (настройка → PATH → `~/.local/bin` → `%LOCALAPPDATA%\Claude-Data\*\claude-code\<версия>\*\`),
+  `status()` (`auth status`), `run()` (`-p`, stream-json, `--tools ""`, `--setting-sources ""`, `--json-schema`), `openLogin()`.
+  Дочернему процессу не передаются переменные `ANTHROPIC_*`/`CLAUDE*` (кроме `CLAUDE_CONFIG_DIR`, `CLAUDE_CODE_OAUTH_TOKEN`, `CLAUDE_CODE_GIT_BASH_PATH`).
+  Тесты подменяют его через `PLANER_CLAUDE_CMD` на `tests/fake-claude.js`.
 - `preload.js` — `window.electronAPI` (contextBridge); пути файлов извлекаются здесь (`webUtils.getPathForFile`), страница путей не видит.
-- `main.js` — окно, меню, трей (крестик/свернуть → трей, выход из меню трея), IPC, ключ API, запросы к api.anthropic.com, превью ссылок; перед скрытием и закрытием — `app:flush`.
+- `main.js` — окно, меню, трей (крестик/свернуть → трей, выход из меню трея), IPC, ключ API, запросы к api.anthropic.com, режим ассистента (`ai:get|set`, `cc:*`), превью ссылок; перед скрытием и закрытием — `app:flush`.
 - `lib/store.js` — документы `docs/<путь с __>.json`, атомарная запись, миграция `planner-data.json` (schema 2), ежедневные копии.
 - `lib/media.js` — медиа `media/<sha256>.<ext>`, проверка сигнатур, миниатюры, векторы зарисовок, схема `media://<id>[/thumb]` с Range, сборка мусора.
 
@@ -35,7 +41,8 @@
 - Доска принадлежит странице: документ `board-<boardId || id страницы>` = `{ v:1, view:{x,y,zoom}, items:[{id,type,x,y,w,h,z,…}] }`;
   типы `note|checklist|image|video|sketch|link`. В board.js «taskId» — это ключ доски (см. `ownerKey`, `findOwner` в index.html).
   Медиа только ссылкой (`mediaId` = sha256), никакого base64. Зарисовка: `mediaId` (PNG) + `strokesId` (векторы); рисунок поверх фото — `overlay`.
-- На диске: `%APPDATA%\Planer\` (`docs/`, `media/`, `backups/`, `planer-meta.json`, `api-key.bin`). `PLANER_DATA_DIR` — другая папка (тесты).
+- На диске: `%APPDATA%\Planer\` (`docs/`, `media/`, `backups/`, `planer-meta.json`, `api-key.bin`, `settings.json` = `{aiMode:'claude-code'|'api', ccModel, claudePath?}`,
+  `claude-work/`). `PLANER_DATA_DIR` — другая папка (тесты). Без `aiMode`: есть ключ → `api`, иначе `claude-code`.
 - Любое изменение раздела: изменить `S[k]`, вызвать `touch(k)`, затем `refreshSection(k)`. На доске — через `change()` или `scheduleSave()`.
 
 ## Правила
@@ -43,7 +50,8 @@
   Удаления в интерфейсе с отменой. Медиа удаляет только сборка мусора (нет ссылок нигде, включая backups, и прошло 7 дней).
 - Безопасность: `contextIsolation: true`, `sandbox: true`, строгая CSP (добавлены только `img-src media:` и `media-src media:`),
   id медиа проверяется `^[a-f0-9]{64}$`, белый список форматов + сигнатуры, ключ API только в основном процессе.
-- Без внешних шрифтов, CDN и телеметрии. Сеть — только ассистент и превью ссылок, которые пользователь сам добавил на доску
+- Без внешних шрифтов, CDN и телеметрии. Сеть — только ассистент (api.anthropic.com из основного процесса или сам Claude Code
+  по подписке пользователя) и превью ссылок, которые пользователь сам добавил на доску
   (`lib/linkpreview.js`: http/https, без адресов локальной сети, лимиты времени и размера, картинка — в медиа-хранилище). Тёмная тема через `prefers-color-scheme`.
 - Клавиши проверяй по `e.code` (раскладка может быть русской). Тексты интерфейса на русском; без `alert/confirm/prompt`.
 - Electron 45: `clipboard` асинхронный (W3C-стиль, `ClipboardItem`), `writeImage` нет.

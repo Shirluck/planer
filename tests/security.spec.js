@@ -49,6 +49,9 @@ test.describe.serial('Безопасность', () => {
       out.html = await api.media.importBuffer('page.svg', 'image/svg+xml', new TextEncoder().encode('<html><script>alert(1)</script></html>'));
       out.url = await api.openUrl('file:///C:/Windows/System32/calc.exe');
       out.url2 = await api.openUrl('javascript:alert(1)');
+      out.cc = await api.ai.ccRun('x', { content: 'нет блоков', system: 1 });
+      out.cc2 = await api.ai.ccRun('y', { content: [{ type: 'image', source: { type: 'url', url: 'file:///C:/x.png' } }] });
+      out.mode = (await api.ai.set({ mode: 'evil', model: 'gpt' }));
       return out;
     });
     expect(r.db).toBe('rejected');
@@ -62,6 +65,9 @@ test.describe.serial('Безопасность', () => {
     expect(r.exe.ok).toBe(false); expect(r.exe.error).toMatch(/не поддерживается/);
     expect(r.html.ok).toBe(false);
     expect(r.url).toBe(false); expect(r.url2).toBe(false);
+    expect(r.cc).toMatchObject({ ok: false, code: 'bad_request' });     // запросы к Claude Code проверяются в основном процессе
+    expect(r.cc2).toMatchObject({ ok: false, code: 'bad_request' });
+    expect(r.mode).toEqual({ mode: 'claude-code', model: 'sonnet' });
     await expect(page.locator('.col')).toHaveCount(4);          // приложение живо
   });
 

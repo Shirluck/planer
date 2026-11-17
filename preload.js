@@ -32,6 +32,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
   anthropic:       (rid, body) => ipcRenderer.invoke('anthropic', rid, body),
   anthropicCancel: rid => ipcRenderer.invoke('anthropic:cancel', rid),
   onAskKey: cb => { ipcRenderer.on('ask-key', () => cb()); },
+  // ассистент: режим (подписка Claude через Claude Code или ключ API) и запуск Claude Code
+  ai: {
+    get:  () => ipcRenderer.invoke('ai:get'),
+    set:  patch => ipcRenderer.invoke('ai:set', patch),
+    onState:    cb => { ipcRenderer.on('ai:state', (_e, s) => cb(s)); },
+    onSettings: cb => { ipcRenderer.on('ai-settings', () => cb()); },
+    ccStatus:   () => ipcRenderer.invoke('cc:status'),
+    ccRun:      (rid, req) => ipcRenderer.invoke('cc:run', rid, req),
+    ccCancel:   rid => ipcRenderer.invoke('cc:cancel', rid),
+    ccLogin:    () => ipcRenderer.invoke('cc:login'),
+    ccPickPath: () => ipcRenderer.invoke('cc:pickPath')
+  },
   media: {
     importFiles,
     importBuffer: (name, mime, data) => ipcRenderer.invoke('media:importBuffer', String(name || ''), String(mime || ''), data),

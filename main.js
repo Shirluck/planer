@@ -1,10 +1,12 @@
-// Основной процесс: окно, хранение данных (документы + медиа), ключ API, запросы к API Anthropic.
+// Основной процесс: окно, хранение данных (документы + медиа), ассистент (подписка Claude через Claude Code
+// или ключ API Anthropic), превью ссылок, трей.
 const { app, BrowserWindow, Menu, Tray, ipcMain, shell, safeStorage, protocol, dialog, clipboard, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { createStore, writeAtomic } = require('./lib/store');
 const { createMedia, sniff } = require('./lib/media');
 const { createLinkPreview } = require('./lib/linkpreview');
+const { createClaudeCode } = require('./lib/claudecode');
 
 // Одинаковая папка данных и в режиме разработки, и в собранном приложении:
 //   Windows: %APPDATA%\Planer     macOS: ~/Library/Application Support/Planer     Linux: ~/.config/Planer
@@ -21,7 +23,7 @@ const dir = () => app.getPath('userData');
 const keyFile = () => path.join(dir(), 'api-key.bin');
 const iconFile = path.join(__dirname, 'build', 'icon.png');
 let win = null;
-let store = null, media = null, linkPreview = null;
+let store = null, media = null, linkPreview = null, claudeCode = null;
 const notices = [];
 
 function sendToPage(channel, ...args) { if (win && !win.isDestroyed()) win.webContents.send(channel, ...args); }
@@ -40,8 +42,75 @@ function initStorage() {
   }
   media = createMedia(dir(), { nativeImage });
   linkPreview = createLinkPreview({ media, allowLocal: process.env.PLANER_ALLOW_LOCAL_PREVIEW === '1' });
+  claudeCode = createClaudeCode({ workDir: path.join(dir(), 'claude-work'), getCustomPath: () => readSettings().claudePath || null });
   store.dailyBackup();
 }
+
+/* ---------- настройки ассистента ---------- */
+// settings.json: { aiMode: 'claude-code' | 'api', ccModel: 'sonnet' | 'opus' | 'haiku', claudePath? }
+// Без настройки: есть сохранённый ключ API — работаем через него, иначе через подписку Claude (Claude Code).
+const settingsFile = () => path.join(dir(), 'settings.json');
+const CC_MODELS = ['sonnet', 'opus', 'haiku'];
+function readSettings() {
+  try { const s = JSON.parse(fs.readFileSync(settingsFile(), 'utf8')); return s && typeof s === 'object' ? s : {}; } catch (_) { return {}; }
+}
+function writeSettings(patch) {
+  const s = Object.assign(readSettings(), patch);
+  writeAtomic(settingsFile(), Buffer.from(JSON.stringify(s, null, 2), 'utf8'));
+  return s;
+}
+function aiState() {
+  const s = readSettings();
+  const mode = s.aiMode === 'api' || s.aiMode === 'claude-code' ? s.aiMode : (readKey() ? 'api' : 'claude-code');
+  return { mode, model: CC_MODELS.includes(s.ccModel) ? s.ccModel : 'sonnet' };
+}
+function setAi(patch) {
+  const p = {};
+  if (patch && (patch.mode === 'api' || patch.mode === 'claude-code')) p.aiMode = patch.mode;
+  if (patch && CC_MODELS.includes(patch.model)) p.ccModel = patch.model;
+  if (Object.keys(p).length) writeSettings(p);
+  buildMenu();
+  const st = aiState();
+  sendToPage('ai:state', st);
+  return st;
+}
+ipcMain.handle('ai:get', () => aiState());
+ipcMain.handle('ai:set', (_e, patch) => setAi(patch));
+
+/* ---------- ассистент через подписку Claude (локальный Claude Code) ---------- */
+const IMG_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+function ccRequest(req) {
+  const r = req || {};
+  const system = String(r.system || '').slice(0, 60000);
+  const names = (Array.isArray(r.toolNames) ? r.toolNames : []).filter(n => typeof n === 'string' && /^[a-z][a-z0-9_]{0,40}$/.test(n)).slice(0, 40);
+  let size = 0;
+  const content = (Array.isArray(r.content) ? r.content : []).slice(0, 80).map(b => {
+    if (b && b.type === 'text' && typeof b.text === 'string') { size += b.text.length; return { type: 'text', text: b.text }; }
+    if (b && b.type === 'image' && b.source && b.source.type === 'base64' && IMG_TYPES.includes(b.source.media_type) && typeof b.source.data === 'string' && /^[A-Za-z0-9+/=]+$/.test(b.source.data.slice(0, 200))) {
+      size += b.source.data.length; return { type: 'image', source: { type: 'base64', media_type: b.source.media_type, data: b.source.data } };
+    }
+    return null;
+  }).filter(Boolean);
+  if (!content.length) throw new Error('empty request');
+  if (size > 24e6) throw new Error('request too large');
+  return { system, content, toolNames: names, model: aiState().model };
+}
+ipcMain.handle('cc:status', () => claudeCode.status());
+ipcMain.handle('cc:run', async (_e, rid, req) => {
+  let q; try { q = ccRequest(req); } catch (e) { return { ok: false, code: 'bad_request', error: String(e.message || e) }; }
+  return claudeCode.run(String(rid || '').slice(0, 80) || 'x', q);
+});
+ipcMain.handle('cc:cancel', (_e, rid) => claudeCode.cancel(String(rid || '')));
+ipcMain.handle('cc:login', () => claudeCode.openLogin());
+ipcMain.handle('cc:pickPath', async () => {
+  const r = await dialog.showOpenDialog(win, { title: 'Где находится Claude Code (claude.exe)?', properties: ['openFile'],
+    filters: process.platform === 'win32' ? [{ name: 'claude.exe', extensions: ['exe'] }] : [] });
+  if (r.canceled || !r.filePaths[0]) return { ok: false, canceled: true };
+  const f = r.filePaths[0];
+  if (!/^claude(\.exe)?$/i.test(path.basename(f))) return { ok: false, error: 'Нужен файл claude.exe (Claude Code).' };
+  writeSettings({ claudePath: f });
+  return { ok: true, path: f };
+});
 
 const docPath = p => { if (!store.validPath(p)) throw new Error('bad path'); return p; };
 ipcMain.handle('db:get', (_e, p) => store.get(docPath(p)));
@@ -123,8 +192,8 @@ function writeKey(k) {
 }
 const clearKey = () => { try { fs.unlinkSync(keyFile()); } catch (_) {} };
 ipcMain.handle('key:has', () => !!readKey());
-ipcMain.handle('key:set', (_e, k) => { if (typeof k !== 'string' || k.length < 20 || k.length > 400) throw new Error('bad key'); writeKey(k.trim()); return true; });
-ipcMain.handle('key:clear', () => { clearKey(); return true; });
+ipcMain.handle('key:set', (_e, k) => { if (typeof k !== 'string' || k.length < 20 || k.length > 400) throw new Error('bad key'); writeKey(k.trim()); setAi({}); return true; });
+ipcMain.handle('key:clear', () => { clearKey(); setAi({}); return true; });
 
 /* ---------- запросы к API Anthropic (ключ не покидает основной процесс) ---------- */
 const inflight = new Map();
@@ -241,6 +310,7 @@ function showAbout() {
   });
 }
 function buildMenu() {
+  const ai = aiState();
   const template = [
     ...(isMac ? [{ role: 'appMenu' }] : []),
     { label: 'Правка', submenu: [
@@ -256,9 +326,13 @@ function buildMenu() {
     ] },
     { role: 'windowMenu', label: 'Окно' },
     { label: 'Ассистент', submenu: [
-      { label: 'Ключ API Anthropic…', click: () => sendToPage('ask-key') },
-      { label: 'Удалить сохранённый ключ', click: () => clearKey() },
+      { label: 'Через подписку Claude (Claude Code)', type: 'radio', checked: ai.mode === 'claude-code', click: () => setAi({ mode: 'claude-code' }) },
+      { label: 'Через ключ API Anthropic', type: 'radio', checked: ai.mode === 'api', click: () => setAi({ mode: 'api' }) },
       { type: 'separator' },
+      { label: 'Подключение и вход в Claude…', click: () => { showWindow(); sendToPage('ai-settings'); } },
+      { type: 'separator' },
+      { label: 'Ключ API Anthropic…', click: () => sendToPage('ask-key') },
+      { label: 'Удалить сохранённый ключ', click: () => { clearKey(); setAi({}); } },
       { label: 'Создать ключ (console.anthropic.com)', click: () => shell.openExternal('https://console.anthropic.com/settings/keys') }
     ] },
     { label: 'Данные', submenu: [
@@ -288,6 +362,6 @@ if (!app.requestSingleInstanceLock()) {
     setTimeout(() => { media.gc(() => store.allDocTexts()).catch(e => console.error('gc:', e)); }, Number(process.env.PLANER_GC_DELAY_MS) || 8000);
     app.on('activate', () => showWindow());
   });
-  app.on('before-quit', () => { quitting = true; try { if (store) store.flush(); if (media) media.saveIndex(); } catch (_) {} });
+  app.on('before-quit', () => { quitting = true; try { if (claudeCode) claudeCode.cancelAll(); if (store) store.flush(); if (media) media.saveIndex(); } catch (_) {} });
   app.on('window-all-closed', () => { if (!isMac) app.quit(); });
 }

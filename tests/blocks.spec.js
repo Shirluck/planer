@@ -188,6 +188,7 @@ test('ассистент создаёт блок времени и кладёт 
         return { ok: true, status: 200, data: { stop_reason: 'end_turn', content: [{ type: 'text', text: 'Готово.' }] } };
       });
     });
+    await page.evaluate(() => window.electronAPI.ai.set({ mode: 'api' }));   // этот сценарий — через ключ API
     await page.click('#aiBtn');
     await page.fill('.ai-in', 'Сделай блок с 10 до 12 «Работа» и положи туда отчёт');
     await page.keyboard.press('Enter');

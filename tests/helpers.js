@@ -13,7 +13,8 @@ function tmpDataDir(tag) { return fs.mkdtempSync(path.join(os.tmpdir(), 'planer-
 function rmDir(d) { try { fs.rmSync(d, { recursive: true, force: true }); } catch (_) {} }
 
 async function launch(dataDir, opts = {}) {
-  const env = { ...process.env, PLANER_DATA_DIR: dataDir, PLANER_TEST: '1', ...(opts.env || {}) };
+  // Вместо настоящего Claude Code — поддельный (tests/fake-claude.js): автотесты не тратят лимиты и не ходят в сеть.
+  const env = { ...process.env, PLANER_DATA_DIR: dataDir, PLANER_TEST: '1', PLANER_CLAUDE_CMD: JSON.stringify([process.execPath, path.join(__dirname, 'fake-claude.js')]), ...(opts.env || {}) };
   delete env.ELECTRON_RUN_AS_NODE;
   const app = opts.executablePath
     ? await _electron.launch({ executablePath: opts.executablePath, args: [], env })

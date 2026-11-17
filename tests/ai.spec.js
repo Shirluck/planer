@@ -39,6 +39,7 @@ test('ассистент читает доску, смотрит картинк�
       });
     }, taskId);
 
+    await page.evaluate(() => window.electronAPI.ai.set({ mode: 'api' }));   // этот сценарий — через ключ API
     await page.click('#aiBtn');
     await page.fill('.ai-in', 'Посмотри картинку на доске ремонта и составь список покупок');
     await page.keyboard.press('Enter');

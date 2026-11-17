@@ -181,6 +181,10 @@ kbd{font:inherit;font-size:11.5px;background:var(--panel-2);border:1px solid var
 .ai.open{transform:none;visibility:visible}
 .ai-head{display:flex;align-items:center;justify-content:space-between;padding:14px 14px 12px 18px;border-bottom:1px solid var(--line)}
 .ai-head h3{margin:0;font-size:15px;display:flex;align-items:center;gap:8px}
+.ai-mode{display:block;margin:2px 0 0 26px;padding:0;font-size:12px;color:var(--muted);text-decoration:underline dotted;text-underline-offset:3px}
+.ai-mode:hover{color:var(--text)}
+.msg .ai-fix{margin-top:2px;padding:6px 12px;border-radius:9px;background:var(--ink);color:var(--ink-text);font-size:12.5px;font-weight:600}
+.msg .ai-err{font-size:12px;color:var(--muted);margin:0 0 8px;word-break:break-word}
 .ai-msgs{flex:1;min-height:0;overflow:auto;padding:16px 16px 8px;display:flex;flex-direction:column;gap:12px}
 .msg{max-width:92%;line-height:1.5;font-size:14px}
 .msg.user{align-self:flex-end;background:var(--ink);color:var(--ink-text);padding:8px 13px;border-radius:14px 14px 4px 14px;white-space:pre-wrap}
@@ -1707,10 +1711,14 @@ function setupBlockEvents(){
 }
 
 /* ---------- AI assistant ---------- */
-let sample = null, aiBusy = false, aiCtrl = null;
+let sample = null, assistant = null, aiMode = null, aiBusy = false, aiCtrl = null;
 const aiHistory = [];
 const aiPanel = $('#aiPanel'), aiBtn = $('#aiBtn');
-let aiMsgs, aiIn, aiSendBtn, aiChips;
+let aiMsgs, aiIn, aiSendBtn, aiChips, aiModeBtn;
+function showAiMode(s){
+  aiMode = s && s.mode;
+  if (aiModeBtn) aiModeBtn.textContent = aiMode === 'claude-code' ? 'через подписку Claude' + (s.model && s.model !== 'sonnet' ? ' · ' + s.model[0].toUpperCase() + s.model.slice(1) : '') : 'через ключ API';
+}
 
 const inlineMd = t => t.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/`([^`]+)`/g, '<code>$1</code>');
 function mdLite(s){
@@ -1729,8 +1737,10 @@ function buildAiPanel(){
   aiSendBtn = h('button', { class:'send', type:'submit', 'aria-label':'Отправить' }, icon('up', 18));
   const chips = ['Составь план на сегодня из задач недели', 'Что самое важное сделать сейчас?', 'Разбери мои идеи: что стоит превратить в план?', 'Подведи итог дня'];
   aiChips = h('div', { class:'chips' }, chips.map(c => h('button', { class:'chip', type:'button', onclick:() => aiSend(c) }, c)));
+  aiModeBtn = h('button', { class:'ai-mode', type:'button', title:'Как подключён ассистент', onclick:() => assistant && assistant.openSettings() });
+  aiModeBtn.hidden = !assistant;
   aiPanel.append(
-    h('div', { class:'ai-head' }, h('h3', {}, icon('spark', 18), 'Ассистент'), tool('x', 'Закрыть', closeAi)),
+    h('div', { class:'ai-head' }, h('div', {}, h('h3', {}, icon('spark', 18), 'Ассистент'), aiModeBtn), tool('x', 'Закрыть', closeAi)),
     aiMsgs, aiChips,
     h('form', { class:'ai-form', onsubmit:e => { e.preventDefault(); if (aiBusy) { aiCtrl && aiCtrl.abort(); return; } const v = aiIn.value.trim(); if (v) { aiIn.value = ''; autosize(aiIn); aiSend(v); } } }, aiIn, aiSendBtn));
   aiIn.addEventListener('input', () => autosize(aiIn));
@@ -1924,9 +1934,18 @@ async function aiSend(text){
     aiHistory.push({ role:'user', content:text }, { role:'assistant', content:final || 'Готово.' });
   } catch (e) {
     md.className = 'md';
-    const code = e && e.code;
+    const code = e && e.code, stopped = (aiCtrl && aiCtrl.signal.aborted) || code === 'aborted';
     const partial = e && e.text ? mdLite(e.text) : '';
-    md.innerHTML = partial + '<p><i>' + (code === 'not_granted' ? 'Нет доступа к ИИ: разрешите его (или проверьте ключ API) и повторите.' : code === 'rate_limited' ? 'Слишком много запросов — подождите немного.' : (aiCtrl && aiCtrl.signal.aborted) ? 'Остановлено.' : 'Не удалось получить ответ. Попробуйте ещё раз.') + '</i></p>';
+    const why = stopped ? 'Остановлено.'
+      : code === 'cc_login' ? 'Claude Code не выполнил вход в ваш аккаунт Claude. Войдите один раз — дальше ассистент будет работать по вашей подписке.'
+      : code === 'cc_missing' ? 'Не найден Claude Code — через него ассистент работает по подписке Claude.'
+      : code === 'not_granted' ? 'Нет доступа к ИИ: проверьте ключ API и повторите.'
+      : code === 'rate_limited' ? (aiMode === 'claude-code' ? 'Лимит подписки Claude временно исчерпан — попробуйте позже.' : 'Слишком много запросов — подождите немного.')
+      : 'Не удалось получить ответ. Попробуйте ещё раз.';
+    md.innerHTML = partial + '<p><i>' + why + '</i></p>';
+    if (!stopped && aiMode === 'claude-code' && code === 'unavailable' && e.message) md.append(h('p', { class:'ai-err' }, String(e.message).slice(0, 300)));
+    if (!stopped && assistant && (code === 'cc_login' || code === 'cc_missing' || code === 'not_granted'))
+      md.append(h('button', { class:'ai-fix', type:'button', onclick:() => assistant.openSettings() }, code === 'cc_login' ? 'Войти в Claude…' : 'Настроить подключение…'));
   } finally {
     aiBusy = false; aiCtrl = null;
     aiSendBtn.replaceChildren(icon('up', 18)); aiSendBtn.setAttribute('aria-label', 'Отправить');
@@ -1936,7 +1955,9 @@ async function aiSend(text){
 async function initAI(){
   try { if (window.claude && window.claude.use) sample = await window.claude.use('sample'); } catch (e) { sample = null; }
   if (!sample) return;
+  try { assistant = await window.claude.use('assistant'); } catch (e) { assistant = null; }
   buildAiPanel();
+  if (assistant) { assistant.onState(showAiMode); assistant.get().then(showAiMode, () => {}); }
   aiBtn.append(icon('spark', 15), 'Ассистент'); aiBtn.hidden = false;
   aiBtn.addEventListener('click', () => aiPanel.classList.contains('open') ? closeAi() : openAi());
 }
