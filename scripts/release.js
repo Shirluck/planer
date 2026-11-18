@@ -81,6 +81,11 @@ function sha256(file) { return crypto.createHash('sha256').update(fs.readFileSyn
   const gh = findGh();
   if (!gh) fail('не найден GitHub CLI (gh). Установка: winget install --id GitHub.cli');
   if (sh(gh, ['auth', 'status']).status !== 0) fail('GitHub CLI не выполнил вход: gh auth login --web --scopes workflow');
+  if (isWin) {   // сборка перезаписывает dist\win-unpacked — запущенный оттуда Планер держит файлы
+    const ps = "(Get-Process -Name Planer -ErrorAction SilentlyContinue | Where-Object { $_.Path -like '" + path.join(ROOT, 'dist').replace(/'/g, "''") + "\\*' } | Measure-Object).Count";
+    const r = sh('powershell', ['-NoProfile', '-NonInteractive', '-Command', ps]);
+    if (Number(String(r.stdout).trim()) > 0) fail('Планер запущен из папки dist — закройте его (значок в трее → «Выйти из Планера»): сборка перезаписывает его файлы.');
+  }
   git('fetch', 'origin', '--tags', '--quiet');
   const behind = tryGit('rev-list', '--count', 'HEAD..origin/main');
   if (behind && behind !== '0') fail('на GitHub есть коммиты, которых нет здесь (' + behind + '): git pull');
