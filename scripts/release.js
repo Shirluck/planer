@@ -31,8 +31,15 @@ const ok = m => console.log('✓ ' + m);
 const sh = (cmd, a, o = {}) => spawnSync(cmd, a, Object.assign({ cwd: ROOT, encoding: 'utf8', shell: false }, o));
 const git = (...a) => { const r = sh('git', a); if (r.status !== 0) throw new Error('git ' + a.join(' ') + ': ' + (r.stderr || r.stdout)); return r.stdout.trim(); };
 const tryGit = (...a) => { const r = sh('git', a); return r.status === 0 ? r.stdout.trim() : null; };
-// npm на Windows — это npm.cmd, его запускает оболочка
-const npm = (...a) => { const r = spawnSync(isWin ? 'npm.cmd' : 'npm', a, { cwd: ROOT, stdio: 'inherit', shell: isWin }); return r.status === 0; };
+// npm: при запуске через «npm run release» — тот же npm-cli.js напрямую через node (без оболочки);
+// иначе на Windows npm.cmd, которому нужна оболочка (аргументы здесь только свои, без пробелов и кавычек)
+const npm = (...a) => {
+  const cli = process.env.npm_execpath;
+  const r = cli && /\.c?js$/i.test(cli)
+    ? spawnSync(process.execPath, [cli, ...a], { cwd: ROOT, stdio: 'inherit' })
+    : spawnSync(isWin ? 'npm.cmd' : 'npm', a, { cwd: ROOT, stdio: 'inherit', shell: isWin });
+  return r.status === 0;
+};
 
 function findGh() {
   const tries = ['gh'];
