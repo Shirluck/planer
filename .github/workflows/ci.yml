@@ -1,0 +1,27 @@
+# Проверки на GitHub при каждой отправке в main и в pull request: типы и модульные тесты (быстро, без окна).
+# Сквозные тесты Electron и сборка установщика выполняются локально: npm test и npm run release.
+name: Проверки
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'   # для проверки типов и модульных тестов сам Electron не нужен
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run test:unit

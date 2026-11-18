@@ -1,9 +1,27 @@
 {
   "name": "planer-desktop",
   "version": "2.5.0",
-  "description": "Планер: день, неделя, основные планы, идеи и доски задач",
-  "author": "Planer",
+  "description": "Планер — личный планировщик для Windows: календарь задач, доски в стиле Milanote, таймеры для фокусировки и ИИ-ассистент",
+  "author": "Shirluck (https://github.com/Shirluck)",
   "license": "MIT",
+  "homepage": "https://github.com/Shirluck/planer#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Shirluck/planer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Shirluck/planer/issues"
+  },
+  "keywords": [
+    "planner",
+    "electron",
+    "desktop",
+    "milanote",
+    "board",
+    "timer",
+    "pomodoro",
+    "russian"
+  ],
   "private": true,
   "main": "main.js",
   "scripts": {
@@ -15,7 +33,8 @@
     "test:packaged": "node scripts/packaged-check.js && playwright test --project=packaged",
     "icons": "node scripts/make-icon.js",
     "dist": "electron-builder",
-    "dist:dir": "electron-builder --dir"
+    "dist:dir": "electron-builder --dir",
+    "release": "node scripts/release.js"
   },
   "devDependencies": {
     "@electron/fuses": "1.8.0",
@@ -30,7 +49,7 @@
     "appId": "local.planer.desktop",
     "productName": "Планер",
     "executableName": "Planer",
-    "copyright": "© 2026 Planer",
+    "copyright": "© 2026 Shirluck",
     "asar": true,
     "electronLanguages": [
       "ru",

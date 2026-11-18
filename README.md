@@ -1,5 +1,13 @@
 # Планер: десктопное приложение
 
+[![Проверки](https://github.com/Shirluck/planer/actions/workflows/ci.yml/badge.svg)](https://github.com/Shirluck/planer/actions/workflows/ci.yml)
+[![Последняя версия](https://img.shields.io/github/v/release/Shirluck/planer?label=%D0%B2%D0%B5%D1%80%D1%81%D0%B8%D1%8F)](https://github.com/Shirluck/planer/releases/latest)
+[![Лицензия: MIT](https://img.shields.io/badge/%D0%BB%D0%B8%D1%86%D0%B5%D0%BD%D0%B7%D0%B8%D1%8F-MIT-blue)](LICENSE)
+
+**Скачать для Windows:** [последний выпуск](https://github.com/Shirluck/planer/releases/latest) —
+`Planer-Setup-<версия>.exe` (установщик) или `Planer-<версия>-portable.exe` (без установки).
+Что нового — в [CHANGELOG.md](CHANGELOG.md).
+
 Четыре колонки: **Сегодня** (план на сегодняшний день), **Неделя** (календарь: каждый день расписывается отдельно,
 на обзоре — только срочное), **Основные планы** и **Идеи** (папки и страницы, у каждой страницы — **доска** в духе Milanote:
 заметки, чек-листы, фото, видео, зарисовки, ссылки и рисунки от руки). Плюс ИИ-ассистент, **таймеры для фокусировки**,
@@ -60,6 +68,35 @@ npm run icons      # пересоздать build/icon.png и build/icon.ico
 
 Собирать нужно на той системе, для которой делается сборка (на macOS — `.dmg`, на Linux — `.AppImage`).
 Версия берётся из `package.json` и видна в меню «Справка → О программе» (на Windows меню скрыто — нажмите Alt).
+
+## Выпуск новой версии на GitHub
+
+Нужен один раз: GitHub CLI и вход в него (`winget install --id GitHub.cli`, затем `gh auth login --web --scopes workflow`).
+
+1. Внесите изменения и закоммитьте их в ветку `main` (`git add -A`, `git commit -m "feat: …"`).
+   Что нового — допишите в раздел «Не выпущено» в [CHANGELOG.md](CHANGELOG.md). Если оставить его пустым,
+   в описание версии попадут темы коммитов.
+2. Выпустите версию одной командой:
+
+```
+npm run release -- minor    # новые возможности: 2.5.0 → 2.6.0
+npm run release -- patch    # только исправления: 2.5.0 → 2.5.1
+npm run release -- major    # большие изменения: 2.5.0 → 3.0.0
+```
+
+Скрипт `scripts/release.js` сам:
+
+- проверит, что всё закоммичено и вход в GitHub выполнен;
+- поднимет номер версии в `package.json` и перенесёт «Не выпущено» в раздел новой версии CHANGELOG;
+- прогонит все тесты, соберёт установщик и portable-версию и проверит собранную программу;
+- сделает коммит `chore(release): X.Y.Z` и тег `vX.Y.Z`, отправит их на GitHub;
+- создаст релиз с файлами `Planer-Setup-X.Y.Z.exe`, `Planer-X.Y.Z-portable.exe` и `SHA256SUMS.txt`.
+
+Если тесты или сборка не прошли, номер версии откатывается и на GitHub ничего не уходит.
+Флаги: `--dry-run` — только проверки и текст релиза, `--draft` — релиз-черновик (публикуется кнопкой на GitHub).
+
+Обычная отправка кода без выпуска версии — `git push`. На GitHub при каждой отправке в `main` запускаются проверки
+(типы и модульные тесты, `.github/workflows/ci.yml`).
 
 ## Проверки
 
@@ -411,3 +448,7 @@ Planer\
   платный сертификат разработчика.
 - Идущие таймеры не переживают выход из программы (шаблоны и настройки звука сохраняются).
 - Проверка типов (`npm run typecheck`) охватывает основной процесс, мост и `src/core.js`; код окна (`src/app/*.js`) пока не типизирован.
+
+## Лицензия
+
+[MIT](LICENSE) © 2026 Shirluck.

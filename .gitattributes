@@ -1,0 +1,7 @@
+# Текстовые файлы в репозитории — с окончаниями строк LF на любой системе; картинки — двоичные.
+* text=auto eol=lf
+*.png binary
+*.ico binary
+*.jpg binary
+*.webm binary
+*.exe binary

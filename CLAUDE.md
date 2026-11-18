@@ -87,3 +87,6 @@
   (Playwright `_electron`, временные папки данных; `PLANER_MINI_KEEP=1` — мини-окно не прячется при потере фокуса).
 - `npm run dist` — установщик и portable в `dist/`; `npm run dist:dir` + `npm run test:packaged` — `scripts/packaged-check.js`
   (fuses, запуск настоящего exe, `ELECTRON_RUN_AS_NODE`, подмена asar) и сквозной тест на копии `dist/win-unpacked-e2e` с разрешённым `--inspect`.
+- Выпуск: `npm run release -- patch|minor|major` (`scripts/release.js`): версия в package.json и CHANGELOG.md («Не выпущено» → «[X.Y.Z] — дата»),
+  все тесты, сборка, тег `vX.Y.Z`, push и релиз на GitHub (Shirluck/planer) с exe и SHA256SUMS. Ветка — `main`.
+  CI на GitHub (`.github/workflows/ci.yml`): typecheck + test:unit. Изменения для пользователя записывать в CHANGELOG.md («Не выпущено»).
