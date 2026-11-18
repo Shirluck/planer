@@ -1,19 +1,29 @@
 # Планер (десктоп, Electron)
 
 Личный планировщик: 4 колонки (Сегодня, Неделя-календарь, Основные планы, Идеи) + ИИ-ассистент + доска у каждой страницы планов и идей
-(холст в стиле Milanote: заметки, чек-листы, фото, видео, зарисовки, ссылки). Интерфейс на русском.
+(холст в стиле Milanote: заметки, чек-листы, фото, видео, зарисовки, ссылки, рисунки от руки). Плюс таймеры для фокусировки,
+поиск `Ctrl+K`, мини-окно «Сегодня» из трея, темы, автозапуск, восстановление из копий. Интерфейс на русском.
 
 ## Файлы
-- `index.html` — основное приложение (CSS + JS, без фреймворков). Внутри один IIFE, блоки по порядку:
-  helpers (`h()` строит DOM, `icon()`/`IC`, `autosize()`), модель (`S` = состояние, `SECTIONS`, `normalize*`),
-  хранение (`touch(k)` помечает раздел изменённым и сохраняет с задержкой, `flush`, `flushEverything`, `extraStore` для досок,
-  `pendingSave` для индикатора), `toast`/`openMenu` (поддерживает пункт `{swatches}`), колонки задач (`buildTaskCol`, `itemEl`,
-  кнопка `.board-btn`), деревья (`buildTreeCol`), редактор страниц, ИИ (`aiTools`, `buildPrompt`, `aiSend`), `createBoards()`, запуск (`main()`).
-- `src/board.js` — доска задачи: `PlanerBoard.create(ctx)` → `{ open, close, flush, readBoard, addCard, findCard, imageForAI, … }`.
+- `index.html` — только разметка и порядок скриптов (встроенного JS нет: CSP `script-src 'self'`). Стили: `src/tokens.css`
+  (цвета тем; тема = `<html data-theme="system|light|dark">`), `src/app.css`, `src/board.css`.
+- `src/app/*.js` — код главного окна, **обычные скрипты** (не модули): верхнеуровневые `const`/`function` общие для всех файлов,
+  порядок подключения важен, запуск — в последнем (`boot.js` → `main()`). По порядку:
+  `base` (`h()`, `icon()`/`IC`, `autosize()`, модель `S`, `SECTIONS`, `normalize`, `findTask`, `findNode`; чистые функции берёт из `PlanerCore`),
+  `store` (`touch(k)` помечает раздел изменённым и сохраняет с задержкой, `flush`, `flushEverything`, `extraStore` для досок, `pendingSave`,
+  `toast`, `openMenu`/`placePopup`, `menuEl` — один открытый поповер), `columns` (`buildBoard`, списки задач `itemEl`, блоки времени),
+  `drag` (`tdrag`), `calendar` («Сегодня», «Неделя», окно дня `openDay`), `tree` (`buildTreeCol`, `openFile`, `findOwner`), `editor` (`openPage`),
+  `ai` (`aiTools`, `buildPrompt`, `aiSend`), `timers` (`TM`, `openTimers`, `ringTimer`, звук Web Audio `playSound`), `search` (`openSearch`,
+  `revealTask`, `revealNode`), `settings` (`SET`, `setUi`, `openSettings`, `openRestore`, `applyRestored`), `mini-host` (ответы мини-окну, `miniNotify`),
+  `boot` (`createBoards`, `runCommand` — команды меню/трея, `main()`).
+- `src/core.js` — чистая логика без DOM (UMD: `window.PlanerCore` и `require`): даты, `normCal`/`normNode`, `parseNewTask`, поиск
+  (`search`, `matchRanges`, `snippet`; без учёта регистра и «ё»), таймеры (`parseDuration`, `fmtClock`, `normTimers`). Покрыт `tests/unit`.
+- `src/board.js` — доска: `PlanerBoard.create(ctx)` → `{ open, close, flush, readBoard, addCard, findCard, imageForAI, reveal, forget, … }`.
   Холст = DOM + CSS transform (`.bd-world`), карточки — абсолютные элементы; отрисовка ключевая (`renderAll` сравнивает подпись карточки).
-  История отмены — снимки JSON массива `items` (100 шагов, на задачу, живёт сессию). `change(fn)` = изменение с записью в историю.
+  История отмены — снимки JSON массива `items` (100 шагов, на доску, живёт сессию). `change(fn)` = изменение с записью в историю.
+  Рисование от руки: режим `B.draw` (`toggleDraw`, `startInk`, `commitInk`, `startErase`), живой слой `B.inkLive`, панель `B.inkBar`.
 - `src/sketch.js` — редактор зарисовок `PlanerSketch.open(opts)` → Promise; общие `drawStrokes`, `drawBackground`.
-- `src/board.css` — стили доски и редактора (только токены из `index.html`).
+- `mini.html`, `src/mini.js`, `src/mini.css` — мини-окно «Сегодня»: своих данных нет, всё через `electronAPI.mini.call` → основной процесс → главное окно.
 - `shim.js` — `window.claude.use('db' | 'user' | 'sample' | 'assistant')` поверх Electron; инструмент может вернуть `{ __content: [блоки] }` (картинка для модели).
   `sample` в режиме `claude-code` (`sampleClaudeCode`): каждый шаг — новый запуск Claude Code, весь ход работы одним сообщением,
   ответ модели — JSON `{reply, tool_calls}`; в режиме `api` — обычный tool use через `anthropic` IPC. Здесь же окно «Ассистент: подключение».
@@ -21,9 +31,14 @@
   `status()` (`auth status`), `run()` (`-p`, stream-json, `--tools ""`, `--setting-sources ""`, `--json-schema`), `openLogin()`.
   Дочернему процессу не передаются переменные `ANTHROPIC_*`/`CLAUDE*` (кроме `CLAUDE_CONFIG_DIR`, `CLAUDE_CODE_OAUTH_TOKEN`, `CLAUDE_CODE_GIT_BASH_PATH`).
   Тесты подменяют его через `PLANER_CLAUDE_CMD` на `tests/fake-claude.js`.
+- `lib/timers.js` — таймеры в основном процессе (точно и в трее): шаблоны в документе `planner-timers`, запущенные — только в памяти.
+- `lib/backups.js` — список копий (`docs-ГГГГ-ММ-ДД`, `manual-…`, `before-restore-…`), чтение, `snapshot`, `restore` (сначала копия текущего).
 - `preload.js` — `window.electronAPI` (contextBridge); пути файлов извлекаются здесь (`webUtils.getPathForFile`), страница путей не видит.
-- `main.js` — окно, меню, трей (крестик/свернуть → трей, выход из меню трея), IPC, ключ API, запросы к api.anthropic.com, режим ассистента (`ai:get|set`, `cc:*`), превью ссылок; перед скрытием и закрытием — `app:flush`.
-- `lib/store.js` — документы `docs/<путь с __>.json`, атомарная запись, миграция `planner-data.json` (schema 2), ежедневные копии.
+- `main.js` — главное окно и мини-окно, меню, трей (щелчок → мини-окно, двойной → главное; крестик/свернуть → трей, выход из меню трея),
+  IPC, ключ API, запросы к api.anthropic.com, режим ассистента (`ai:get|set`, `cc:*`), превью ссылок, оформление (`ui:*`: `nativeTheme`,
+  zoom), автозапуск (`autostart:*`, `--hidden`), таймеры (`timer:*`), копии (`backup:*`), пересылка мини-окна (`mini:*`);
+  перед скрытием и закрытием — `app:flush`. `PLANER_SMOKE=1` — проверка собранного exe (`smoke.json` и выход).
+- `lib/store.js` — документы `docs/<путь с __>.json`, атомарная запись, миграция `planner-data.json` (schema 2), ежедневные копии (раз в час проверка).
 - `lib/media.js` — медиа `media/<sha256>.<ext>`, проверка сигнатур, миниатюры, векторы зарисовок, схема `media://<id>[/thumb]` с Range, сборка мусора.
 
 ## Данные
@@ -39,23 +54,36 @@
   `kind` определяет, что открывает двойной щелчок (`openFile`): текст — редактор страницы, доска — `openNodeBoard`. Содержимое обоих видов хранится независимо.
   Карточка-ссылка на доске хранит превью: `ptitle, desc, site, kind, image` (mediaId), `pv` ('ok'|'fail'), `pvUrl`, `pvAt`.
 - Доска принадлежит странице: документ `board-<boardId || id страницы>` = `{ v:1, view:{x,y,zoom}, items:[{id,type,x,y,w,h,z,…}] }`;
-  типы `note|checklist|image|video|sketch|link`. В board.js «taskId» — это ключ доски (см. `ownerKey`, `findOwner` в index.html).
+  типы `note|checklist|image|video|sketch|link|ink`. В board.js «taskId» — это ключ доски (см. `ownerKey`, `findOwner`).
   Медиа только ссылкой (`mediaId` = sha256), никакого base64. Зарисовка: `mediaId` (PNG) + `strokesId` (векторы); рисунок поверх фото — `overlay`.
-- На диске: `%APPDATA%\Planer\` (`docs/`, `media/`, `backups/`, `planer-meta.json`, `api-key.bin`, `settings.json` = `{aiMode:'claude-code'|'api', ccModel, claudePath?}`,
-  `claude-work/`). `PLANER_DATA_DIR` — другая папка (тесты). Без `aiMode`: есть ключ → `api`, иначе `claude-code`.
+  Рисунок от руки `ink`: `vw, vh` (система координат штрихов, карточка растягивает её на `w×h` без искажения),
+  `strokes:[{c: 'ink'|'red'|'orange'|'green'|'blue'|'purple', w, m?:1 (маркер), p:[x,y,…]}]` — числа прямо в JSON (это векторы, не медиа).
+- Таймеры: документ `planner-timers` = `{ v:1, presets:[{id,title,ms}], sound:'bell'|'soft'|'alarm'|'beep', volume 0..1, repeat 1..10 }`.
+- На диске: `%APPDATA%\Planer\` (`docs/`, `media/`, `backups/`, `planer-meta.json`, `api-key.bin`, `claude-work/`,
+  `settings.json` = `{aiMode:'claude-code'|'api', ccModel, claudePath?, theme:'system'|'light'|'dark', zoom 0.8…1.5, compact, autostart}`).
+  `PLANER_DATA_DIR` — другая папка (тесты). Без `aiMode`: есть ключ → `api`, иначе `claude-code`.
 - Любое изменение раздела: изменить `S[k]`, вызвать `touch(k)`, затем `refreshSection(k)`. На доске — через `change()` или `scheduleSave()`.
 
 ## Правила
 - Данные пользователя не терять: запись атомарная, перед миграциями копия, повреждённые файлы откладываются в `.corrupt-*`.
-  Удаления в интерфейсе с отменой. Медиа удаляет только сборка мусора (нет ссылок нигде, включая backups, и прошло 7 дней).
-- Безопасность: `contextIsolation: true`, `sandbox: true`, строгая CSP (добавлены только `img-src media:` и `media-src media:`),
-  id медиа проверяется `^[a-f0-9]{64}$`, белый список форматов + сигнатуры, ключ API только в основном процессе.
+  Удаления в интерфейсе с отменой. Восстановление из копии сначала сохраняет текущее в `before-restore-…`.
+  Медиа удаляет только сборка мусора (нет ссылок нигде, включая backups, и прошло 7 дней).
+- Безопасность: `contextIsolation: true`, `sandbox: true`, строгая CSP (`script-src 'self'` — встроенных скриптов нет; добавлены только
+  `img-src media:` и `media-src media:`), id медиа проверяется `^[a-f0-9]{64}$`, белый список форматов + сигнатуры, ключ API только
+  в основном процессе. IPC проверяет входные данные; запросы `mini:*` принимаются только от мини-окна.
+  Сборка: Electron fuses (`package.json` → `build.electronFuses`): без RunAsNode, NODE_OPTIONS и `--inspect`, только `app.asar` с проверкой
+  целостности. `GrantFileProtocolExtraPrivileges` оставлен включённым — без него страница не грузится из asar по `file://`.
 - Без внешних шрифтов, CDN и телеметрии. Сеть — только ассистент (api.anthropic.com из основного процесса или сам Claude Code
   по подписке пользователя) и превью ссылок, которые пользователь сам добавил на доску
-  (`lib/linkpreview.js`: http/https, без адресов локальной сети, лимиты времени и размера, картинка — в медиа-хранилище). Тёмная тема через `prefers-color-scheme`.
-- Клавиши проверяй по `e.code` (раскладка может быть русской). Тексты интерфейса на русском; без `alert/confirm/prompt`.
-- Electron 45: `clipboard` асинхронный (W3C-стиль, `ClipboardItem`), `writeImage` нет.
+  (`lib/linkpreview.js`: http/https, без адресов локальной сети, лимиты времени и размера, картинка — в медиа-хранилище).
+- Тема: `nativeTheme.themeSource` в основном процессе + `data-theme` на странице; новые цвета — только токенами из `src/tokens.css`.
+- Клавиши проверяй по `e.code` (раскладка может быть русской). Тексты интерфейса на русском; без `alert/confirm/prompt`
+  (подтверждение — второе нажатие кнопки, см. `confirmBtn`).
+- Electron 45: `clipboard` асинхронный (W3C-стиль, `ClipboardItem`), `writeImage` нет. Событие `console-message` — один объект `{level, message}`.
 
 ## Команды
-- `npm install`, `npm start` — запуск; `npm test` — автотесты (Playwright `_electron`, временные папки данных);
-- `npm run dist` — установщик и portable в `dist/`; `npm run dist:dir` + `npm run test:packaged` — проверка собранного приложения.
+- `npm install`, `npm start` — запуск.
+- `npm test` = `typecheck` (tsc по JSDoc: main, preload, lib, src/core.js) + `test:unit` (`node --test tests/unit`) + `test:e2e`
+  (Playwright `_electron`, временные папки данных; `PLANER_MINI_KEEP=1` — мини-окно не прячется при потере фокуса).
+- `npm run dist` — установщик и portable в `dist/`; `npm run dist:dir` + `npm run test:packaged` — `scripts/packaged-check.js`
+  (fuses, запуск настоящего exe, `ELECTRON_RUN_AS_NODE`, подмена asar) и сквозной тест на копии `dist/win-unpacked-e2e` с разрешённым `--inspect`.

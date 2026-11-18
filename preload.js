@@ -62,5 +62,52 @@ contextBridge.exposeInMainWorld('electronAPI', {
   notices:  () => ipcRenderer.invoke('app:notices'),
   appInfo:  () => ipcRenderer.invoke('app:info'),
   onFlush:  cb => { ipcRenderer.on('app:flush', async () => { try { await cb(); } catch (_) {} ipcRenderer.send('app:flushed'); }); },
-  onStoreError: cb => { ipcRenderer.on('store:error', (_e, m) => cb(String(m || ''))); }
+  onStoreError: cb => { ipcRenderer.on('store:error', (_e, m) => cb(String(m || ''))); },
+  // команды из меню и трея: 'search', 'timers', 'settings', 'restore', 'task' <id>, 'toast' <текст>
+  onCommand: cb => { ipcRenderer.on('app:command', (_e, cmd, arg) => cb(String(cmd || ''), arg)); },
+  // таймеры для фокусировки (идут в основном процессе)
+  timers: {
+    state:      () => ipcRenderer.invoke('timer:state'),
+    start:      a => ipcRenderer.invoke('timer:start', a),
+    pause:      id => ipcRenderer.invoke('timer:pause', id),
+    resume:     id => ipcRenderer.invoke('timer:resume', id),
+    stop:       id => ipcRenderer.invoke('timer:stop', id),
+    stopAll:    () => ipcRenderer.invoke('timer:stopAll'),
+    add:        (id, ms) => ipcRenderer.invoke('timer:add', id, ms),
+    setPresets: list => ipcRenderer.invoke('timer:setPresets', list),
+    setSound:   s => ipcRenderer.invoke('timer:setSound', s),
+    onState:    cb => { ipcRenderer.on('timer:state', (_e, s) => cb(s)); },
+    onDone:     cb => { ipcRenderer.on('timer:done', (_e, t) => cb(t)); }
+  },
+  // оформление (тема, размер, компактный режим) и автозапуск
+  ui: {
+    get:     () => ipcRenderer.invoke('ui:get'),
+    set:     patch => ipcRenderer.invoke('ui:set', patch),
+    onState: cb => { ipcRenderer.on('ui:state', (_e, s) => cb(s)); }
+  },
+  autostart: {
+    get:     () => ipcRenderer.invoke('autostart:get'),
+    set:     on => ipcRenderer.invoke('autostart:set', on),
+    onState: cb => { ipcRenderer.on('autostart:state', (_e, s) => cb(s)); }
+  },
+  // резервные копии: список, документ из копии, восстановление (текущее сначала сохраняется в копию)
+  backups: {
+    list:       () => ipcRenderer.invoke('backup:list'),
+    read:       (id, p) => ipcRenderer.invoke('backup:read', id, p),
+    restore:    (id, paths) => ipcRenderer.invoke('backup:restore', id, paths),
+    snapshot:   () => ipcRenderer.invoke('backup:snapshot'),
+    openFolder: () => ipcRenderer.invoke('backup:openFolder')
+  },
+  // мини-окно «Сегодня»: главное окно отвечает на его запросы (состояние живёт здесь)
+  miniHost: {
+    onOp:    cb => { ipcRenderer.on('mini:op', async (_e, m) => { let r = null; try { r = await cb(m.op, m.args); } catch (_) { r = null; } ipcRenderer.send('mini:reply', m.id, r); }); },
+    changed: () => ipcRenderer.send('mini:changed')
+  },
+  // само мини-окно (mini.html)
+  mini: {
+    call:     (op, args) => ipcRenderer.invoke('mini:call', op, args),
+    openMain: what => ipcRenderer.invoke('mini:openMain', what),
+    hide:     () => ipcRenderer.invoke('mini:hide'),
+    onRefresh: cb => { ipcRenderer.on('mini:refresh', () => cb()); }
+  }
 });

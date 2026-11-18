@@ -199,4 +199,64 @@ test.describe.serial('Скриншоты', () => {
     await shot('board-150-cards-light');
     await page.keyboard.press('Escape');
   });
+
+  test('таймеры, поиск, настройки, восстановление, мини-окно, рисование', async () => {
+    await setSize(app, 1280, 800);
+    // таймер идёт: кнопка в шапке и панель
+    await page.evaluate(() => window.electronAPI.timers.start({ presetId: 'focus' }));
+    await page.click('#timerBtn');
+    await expect(page.locator('.tm-run')).toHaveCount(1);
+    await shot('timers-light');
+    await scheme('dark'); await shot('timers-dark'); await scheme('light');
+    await page.keyboard.press('Escape');
+    // окончание таймера
+    await page.evaluate(() => ringTimer({ id: 'x', title: 'Фокус', ms: 25 * 60000 }));
+    await shot('timer-done-light');
+    await page.locator('.tm-done .primary').click();
+    // поиск
+    await page.keyboard.press('Control+KeyK');
+    await page.locator('.sp-in').fill('фасад');
+    await expect(page.locator('.sp-row').first()).toBeVisible();
+    await shot('search-light');
+    await scheme('dark'); await shot('search-dark'); await scheme('light');
+    await page.keyboard.press('Escape');
+    // настройки и восстановление
+    await page.click('#settingsBtn');
+    await shot('settings-light');
+    await scheme('dark'); await shot('settings-dark'); await scheme('light');
+    await page.locator('.st-btns button', { hasText: 'Сделать копию сейчас' }).click();
+    await page.locator('.st-btns button', { hasText: 'Восстановить из копии' }).click();
+    await expect(page.locator('.rs-doc').first()).toBeVisible();
+    await shot('restore-light');
+    await page.keyboard.press('Escape');
+    // компактный режим
+    await page.evaluate(() => setUi({ compact: true }));
+    await shot('main-compact-light');
+    await page.evaluate(() => setUi({ compact: false }));
+    // мини-окно «Сегодня»
+    const [mini] = await Promise.all([app.waitForEvent('window'), app.evaluate(() => global.__planerTray.click())]);
+    await expect(mini.locator('.mn-item').first()).toBeVisible();
+    await mini.waitForTimeout(300);
+    await mini.screenshot({ path: path.join(OUT, 'mini-today-light.png') });
+    await mini.emulateMedia({ colorScheme: 'dark' }); await mini.waitForTimeout(200);
+    await mini.screenshot({ path: path.join(OUT, 'mini-today-dark.png') });
+    await app.evaluate(() => global.__planerTray.mini().hide());
+    await page.evaluate(() => window.electronAPI.timers.stopAll());
+    // рисование от руки на доске
+    const tid = await addPage(page, 'ideas', 'Набросок');
+    await openBoard(page, tid);
+    const vp = await page.locator('.bd-vp').boundingBox();
+    const line = async (pts) => { await page.mouse.move(vp.x + pts[0][0], vp.y + pts[0][1]); await page.mouse.down(); for (const p of pts.slice(1)) await page.mouse.move(vp.x + p[0], vp.y + p[1], { steps: 6 }); await page.mouse.up(); };
+    await page.click('.bd-rail-btn[aria-label="Рисовать"]');
+    await line([[260, 420], [260, 260], [370, 180], [480, 260], [480, 420], [260, 420]]);
+    await line([[340, 420], [340, 330], [400, 330], [400, 420]]);
+    await page.click('.bd-ib-c[aria-label="Оранжевый"]'); await page.click('.bd-ib-tool[aria-label^="Маркер"]');
+    const sun = []; for (let a = 0; a <= 360; a += 15) sun.push([640 + 40 * Math.cos(a * Math.PI / 180), 200 + 40 * Math.sin(a * Math.PI / 180)]);
+    await line(sun);
+    await page.click('.bd-ib-c[aria-label="Зелёный"]'); await page.click('.bd-ib-tool[aria-label^="Перо"]');
+    await line([[180, 440], [300, 445], [420, 438], [560, 446], [700, 440]]);
+    await shot('board-drawing-light');
+    await scheme('dark'); await shot('board-drawing-dark'); await scheme('light');
+    await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
+  });
 });

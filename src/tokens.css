@@ -1,0 +1,31 @@
+/* Планер — цвета темы. Тема: как в системе (prefers-color-scheme), светлая или тёмная — атрибут data-theme у <html>
+   (ставит src/app/settings.js по настройке из основного процесса). Общие для главного окна и мини-окна «Сегодня». */
+:root{
+  color-scheme:light;
+  --bg:#f3f1ec; --panel:#fffdfa; --panel-2:#f8f6f1; --line:#e8e4dc; --line-2:#d6d1c6;
+  --text:#25221e; --muted:#6f6a63; --faint:#b5afa5; --hover:#f2efe9;
+  --p1:#2f6fe0; --p2:#c97f00; --p3:#d93a40;
+  --c-day:#0b8a80; --c-week:#5156d6; --c-plans:#c0602f; --c-ideas:#a145b8;
+  --shadow:0 1px 2px rgba(37,34,30,.06),0 6px 18px rgba(37,34,30,.05);
+  --ink:#25221e; --ink-text:#fffdfa;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme=light]){
+    color-scheme:dark;
+    --bg:#131210; --panel:#1b1916; --panel-2:#211f1b; --line:#2c2924; --line-2:#3c3831;
+    --text:#ece8e0; --muted:#9a9388; --faint:#5e5950; --hover:#24221e;
+    --p1:#6ea0ff; --p2:#e8a43a; --p3:#ff6b6f;
+    --c-day:#36c2b6; --c-week:#8a8eff; --c-plans:#ee8f5c; --c-ideas:#cf7ee3;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.25);
+    --ink:#ece8e0; --ink-text:#1b1916;
+  }
+}
+:root[data-theme=dark]{
+  color-scheme:dark;
+  --bg:#131210; --panel:#1b1916; --panel-2:#211f1b; --line:#2c2924; --line-2:#3c3831;
+  --text:#ece8e0; --muted:#9a9388; --faint:#5e5950; --hover:#24221e;
+  --p1:#6ea0ff; --p2:#e8a43a; --p3:#ff6b6f;
+  --c-day:#36c2b6; --c-week:#8a8eff; --c-plans:#ee8f5c; --c-ideas:#cf7ee3;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.25);
+  --ink:#ece8e0; --ink-text:#1b1916;
+}

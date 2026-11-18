@@ -86,6 +86,30 @@ test.describe.serial('Безопасность', () => {
     expect(csp).toContain('img-src \'self\' data: media:');
     expect(csp).toContain('media-src media:');
     expect(csp).toContain("default-src 'none'");
+    expect(csp).toMatch(/script-src 'self';/);                       // встроенных скриптов на странице нет — 'unsafe-inline' не нужен
+    const inlineRuns = await page.evaluate(() => { const s = document.createElement('script'); s.textContent = 'window.__inline = 1'; document.head.append(s); return window.__inline === 1; });
+    expect(inlineRuns).toBe(false);
+  });
+
+  test('новые каналы IPC (таймеры, оформление, автозапуск, копии) не принимают мусор', async () => {
+    const r = await page.evaluate(async () => {
+      const a = window.electronAPI;
+      const out = {};
+      out.t1 = await a.timers.start({ title: '<b>x</b>', ms: -5 });
+      out.t2 = await a.timers.start({ presetId: { evil: 1 } });
+      out.t3 = await a.timers.start('строка');
+      out.t4 = await a.timers.add('нет-такого', 60000);
+      out.p = await a.timers.setPresets([{ id: '../../x', title: 'x'.repeat(500), ms: 60000 }, { title: 'bad', ms: 'abc' }]);
+      out.au = await a.autostart.set('yes');
+      out.bk = await a.backups.read('docs-2026-01-01', 'data/users/local/../../secret');
+      out.mini = await a.mini.call('today');
+      return out;
+    });
+    expect(r.t1.ok).toBe(false); expect(r.t2.ok).toBe(false); expect(r.t3.ok).toBe(false); expect(r.t4).toBe(false);
+    expect(r.p).toEqual([{ id: 'x', title: 'x'.repeat(60), ms: 60000 }]);
+    expect(r.au.enabled).toBe(false);                                // только true включает автозапуск
+    expect(r.bk).toBe(null);
+    expect(r.mini).toEqual({ ok: false });                           // запросы мини-окна — только от мини-окна
   });
 
   test('переход со страницы (например, брошенный в окно файл) блокируется', async () => {

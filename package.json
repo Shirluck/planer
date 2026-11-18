@@ -1,6 +1,6 @@
 {
   "name": "planer-desktop",
-  "version": "2.4.0",
+  "version": "2.5.0",
   "description": "Планер: день, неделя, основные планы, идеи и доски задач",
   "author": "Planer",
   "license": "MIT",
@@ -8,18 +8,23 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "test": "playwright test --project=app",
-    "test:packaged": "playwright test --project=packaged",
+    "test": "npm run typecheck && npm run test:unit && npm run test:e2e",
+    "typecheck": "tsc -p .",
+    "test:unit": "node --test \"tests/unit/*.test.js\"",
+    "test:e2e": "playwright test --project=app",
+    "test:packaged": "node scripts/packaged-check.js && playwright test --project=packaged",
     "icons": "node scripts/make-icon.js",
     "dist": "electron-builder",
     "dist:dir": "electron-builder --dir"
   },
   "devDependencies": {
+    "@electron/fuses": "1.8.0",
     "@playwright/test": "1.65.1",
     "electron": "45.3.3",
     "electron-builder": "26.18.0",
     "png-to-ico": "3.0.2",
-    "sharp": "0.35.5"
+    "sharp": "0.35.5",
+    "typescript": "5.9.3"
   },
   "build": {
     "appId": "local.planer.desktop",
@@ -27,11 +32,25 @@
     "executableName": "Planer",
     "copyright": "© 2026 Planer",
     "asar": true,
+    "electronLanguages": [
+      "ru",
+      "en-US"
+    ],
+    "electronFuses": {
+      "runAsNode": false,
+      "enableCookieEncryption": true,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "enableEmbeddedAsarIntegrityValidation": true,
+      "onlyLoadAppFromAsar": true,
+      "grantFileProtocolExtraPrivileges": true
+    },
     "files": [
       "main.js",
       "preload.js",
       "shim.js",
       "index.html",
+      "mini.html",
       "lib/**/*.js",
       "src/**/*.{js,css}",
       "build/icon.png",

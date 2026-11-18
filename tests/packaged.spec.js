@@ -1,16 +1,17 @@
-// Сквозной тест собранного приложения: dist/win-unpacked/Planer.exe (или путь из PLANER_EXE).
-// Запуск: npm run dist:dir && npm run test:packaged
+// Сквозной тест собранного приложения. Запуск: npm run dist:dir && npm run test:packaged.
+// scripts/packaged-check.js проверяет настоящий dist/win-unpacked/Planer.exe (защита, запуск) и готовит копию
+// dist/win-unpacked-e2e, где разрешён отладчик для Playwright (или путь из PLANER_EXE).
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 const fs = require('fs');
 const { ROOT, fx, tmpDataDir, rmDir, launch, closeApp, addTask, addPage, openBoard, waitBoard, vpPoint, waitCal, isoDay } = require('./helpers');
 
-const exe = process.env.PLANER_EXE || path.join(ROOT, 'dist', 'win-unpacked', process.platform === 'win32' ? 'Planer.exe' : 'planer');
+const exe = process.env.PLANER_EXE || path.join(ROOT, 'dist', 'win-unpacked-e2e', process.platform === 'win32' ? 'Planer.exe' : 'planer');
 
 test('собранное приложение: запуск, доска, медиа, перезапуск', async () => {
-  test.skip(!fs.existsSync(exe), 'нет сборки: выполните npm run dist:dir');
+  test.skip(!fs.existsSync(exe), 'нет сборки: выполните npm run dist:dir && npm run test:packaged');
   const dir = tmpDataDir('packaged');
-  let { app, page, errors } = await launch(dir, { executablePath: exe, size: [1280, 800] });
+  let { app, page, errors } = await launch(dir, { executablePath: exe, size: [1280, 800], env: { PLANER_MINI_KEEP: '1' } });
   let taskId;
   try {
     const info = await app.evaluate(({ app }) => ({ packaged: app.isPackaged, version: app.getVersion(), name: app.getName(), appPath: app.getAppPath() }));
@@ -20,6 +21,13 @@ test('собранное приложение: запуск, доска, мед�
     expect(await page.evaluate(() => window.electronAPI.appInfo().then(i => i.version))).toBe(info.version);
     await addTask(page, 'day', 'Задача из сборки !!!');
     await waitCal(page, c => c.days[isoDay(0)] && c.days[isoDay(0)].items.length === 1);
+    // мини-окно «Сегодня» (своя страница внутри app.asar) и таймер
+    const [mini] = await Promise.all([app.waitForEvent('window'), app.evaluate(() => global.__planerTray.click())]);
+    await expect(mini.locator('.mn-item .mn-t')).toHaveText('Задача из сборки');
+    await mini.locator('.mn-chip').first().click();
+    await expect(page.locator('#timerBtn')).toHaveClass(/running/);
+    await page.evaluate(() => window.electronAPI.timers.stopAll());
+    await app.evaluate(() => global.__planerTray.mini().hide());
     taskId = await addPage(page, 'plans', 'Проверка сборки');
     await openBoard(page, taskId);
     const p = await vpPoint(page, 0.3, 0.3);

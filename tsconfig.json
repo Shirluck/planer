@@ -1,0 +1,21 @@
+{
+  // Проверка типов без сборки (npm run typecheck): обычный JavaScript + JSDoc, tsc ничего не выпускает.
+  // Проверяются основной процесс, мост preload, модули lib/ и чистая логика src/core.js.
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "target": "ES2022",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "lib": ["ES2023", "DOM"],
+    "types": ["node"],
+    "strict": false,
+    "noImplicitAny": false,
+    "strictNullChecks": false,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true
+  },
+  "include": ["main.js", "preload.js", "lib/**/*.js", "src/core.js", "tests/unit/**/*.js"]
+}

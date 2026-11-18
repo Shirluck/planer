@@ -5,10 +5,16 @@
 'use strict';
 
 const ID_RE = /^[a-f0-9]{64}$/;
-const TYPES = ['note', 'checklist', 'image', 'video', 'sketch', 'link'];
+const TYPES = ['note', 'checklist', 'image', 'video', 'sketch', 'link', 'ink'];
 const COLORS = ['', 'yellow', 'green', 'blue', 'pink', 'purple'];
 const COLOR_NAMES = { '': 'Без цвета', yellow: 'Жёлтый', green: 'Зелёный', blue: 'Голубой', pink: 'Розовый', purple: 'Сиреневый' };
-const TYPE_NAMES = { note: 'Заметка', checklist: 'Чек-лист', image: 'Изображение', video: 'Видео', sketch: 'Зарисовка', link: 'Ссылка' };
+const TYPE_NAMES = { note: 'Заметка', checklist: 'Чек-лист', image: 'Изображение', video: 'Видео', sketch: 'Зарисовка', link: 'Ссылка', ink: 'Рисунок' };
+// Рисование от руки прямо на холсте: штрихи векторами (числа в JSON карточки), цвета — по имени (ink = цвет текста темы).
+const INK_COLORS = ['ink', 'red', 'orange', 'green', 'blue', 'purple'];
+const INK_COLOR_NAMES = { ink: 'Чёрный', red: 'Красный', orange: 'Оранжевый', green: 'Зелёный', blue: 'Синий', purple: 'Фиолетовый' };
+const INK_HEX = { ink: '#25221e', red: '#e5484d', orange: '#f08c1a', green: '#2fa36b', blue: '#2f6fe0', purple: '#9b4dca' };
+const INK_SIZES = { s: 2, m: 4, l: 9 };         // толщина пера на экране, px (в мире холста делится на масштаб)
+const INK_TOOLS = { pen: 'Перо', marker: 'Маркер', eraser: 'Ластик' };
 const BGS = ['transparent', 'white', 'grid', 'lines'];
 const ZMIN = 0.1, ZMAX = 4, HISTORY = 100, GAP = 24, GRID = 24;
 const ACCEPT = 'image/png,image/jpeg,image/gif,image/webp,image/avif,image/svg+xml,video/mp4,video/webm,video/quicktime,video/x-matroska,.png,.jpg,.jpeg,.gif,.webp,.avif,.svg,.mp4,.m4v,.webm,.mov,.mkv';
@@ -34,6 +40,9 @@ const ICONS = {
   bold: '<path d="M7 5h6a3.5 3.5 0 010 7H7zM7 12h7a3.5 3.5 0 010 7H7z"/>',
   caption: '<path d="M4 6h16M4 12h16M4 18h9"/>',
   hand: '<path d="M8 13V6a1.5 1.5 0 013 0v5M11 11V4.5a1.5 1.5 0 013 0V11M14 11V6a1.5 1.5 0 013 0v7c0 4-2.5 7-6 7s-5-2-6.5-4.5L3 12.8a1.5 1.5 0 012.5-1.6L8 14"/>',
+  pen: '<path d="M4 20l1.2-4.6L15.6 5a2 2 0 012.8 0l.6.6a2 2 0 010 2.8L8.6 18.8z"/><path d="M13.5 7l3.5 3.5"/><path d="M4 20h7" opacity=".55"/>',
+  marker: '<path d="M7 14l7.5-7.5a2.1 2.1 0 013 3L10 17"/><path d="M7 14l-1.5 4.5L10 17z"/><path d="M4 21h9" stroke-width="3" opacity=".45"/>',
+  eraser: '<path d="M8.5 20H20"/><path d="M5.6 15.4l8.8-8.8a2 2 0 012.8 0l2.2 2.2a2 2 0 010 2.8L12 19l-3.5 1-3-3a2 2 0 01.1-1.6z"/><path d="M9.5 11.5l5 5"/>',
   noimg: '<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M4 4l16 16"/>'
 };
 
@@ -114,8 +123,64 @@ function normItem(it) {
       if (mid(it.image)) { o.image = it.image; o.imgW = num(it.imgW, 0); o.imgH = num(it.imgH, 0); o.imgThumb = !!it.imgThumb; }
       if (it.pv === 'ok' || it.pv === 'fail') { o.pv = it.pv; o.pvUrl = str(it.pvUrl, 2000); o.pvAt = num(it.pvAt, 0); }
       break;
+    case 'ink':
+      o.w = Math.round(clampN(num(it.w, 100), 4, 20000)); o.h = Math.round(clampN(num(it.h, 100), 4, 20000));
+      o.vw = clampN(num(it.vw, o.w), 1, 40000); o.vh = clampN(num(it.vh, o.h), 1, 40000);
+      o.strokes = (Array.isArray(it.strokes) ? it.strokes : []).slice(0, 3000).map(normStroke).filter(Boolean);
+      if (!o.strokes.length) return null;
+      break;
   }
   return o;
+}
+/* ---------- штрихи рисунка: { c: цвет, w: толщина, m: 1 — маркер (полупрозрачный), p: [x, y, x, y, …] } ---------- */
+const r1 = v => Math.round(v * 10) / 10;
+function normStroke(s) {
+  if (!s || !Array.isArray(s.p)) return null;
+  const p = [];
+  for (let i = 0; i + 1 < s.p.length && p.length < 8000; i += 2) {
+    const x = s.p[i], y = s.p[i + 1];
+    if (typeof x === 'number' && typeof y === 'number' && isFinite(x) && isFinite(y)) p.push(r1(x), r1(y));
+  }
+  if (!p.length) return null;
+  const o = { c: INK_COLORS.includes(s.c) ? s.c : 'ink', w: r1(clampN(num(s.w, 3), 0.3, 600)), p };
+  if (s.m) o.m = 1;
+  return o;
+}
+// Линия через точки как есть: плавность даёт плотность точек (упрощение оставляет отклонение меньше пикселя),
+// а углы остаются углами — квадрат не превращается в круг.
+function inkPath(p) {
+  let d = 'M' + p[0] + ' ' + p[1];
+  if (p.length === 2) return d + 'l0.01 0';
+  for (let i = 2; i + 1 < p.length; i += 2) d += 'L' + p[i] + ' ' + p[i + 1];
+  return d;
+}
+// Упрощение ломаной (Рамер — Дуглас — Пекер): меньше точек при том же виде.
+function simplify(p, eps) {
+  const n = p.length / 2;
+  if (n <= 2) return p.slice();
+  const keep = new Uint8Array(n); keep[0] = keep[n - 1] = 1;
+  const stack = [[0, n - 1]];
+  while (stack.length) {
+    const [a, b] = stack.pop();
+    const ax = p[2 * a], ay = p[2 * a + 1], bx = p[2 * b], by = p[2 * b + 1];
+    let best = -1, bi = -1;
+    for (let i = a + 1; i < b; i++) { const d = segDist(p[2 * i], p[2 * i + 1], ax, ay, bx, by); if (d > best) { best = d; bi = i; } }
+    if (best > eps) { keep[bi] = 1; stack.push([a, bi], [bi, b]); }
+  }
+  const out = [];
+  for (let i = 0; i < n; i++) if (keep[i]) out.push(p[2 * i], p[2 * i + 1]);
+  return out;
+}
+function segDist(px, py, ax, ay, bx, by) {
+  const dx = bx - ax, dy = by - ay, l = dx * dx + dy * dy;
+  const t = l ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / l)) : 0;
+  return Math.hypot(px - ax - t * dx, py - ay - t * dy);
+}
+function strokeHits(s, x, y, r) {
+  const p = s.p, lim = r + s.w / 2;
+  if (p.length === 2) return Math.hypot(p[0] - x, p[1] - y) <= lim;
+  for (let i = 0; i + 3 < p.length; i += 2) if (segDist(x, y, p[i], p[i + 1], p[i + 2], p[i + 3]) <= lim) return true;
+  return false;
 }
 function normDoc(d) {
   d = d && typeof d === 'object' ? d : {};
@@ -177,8 +242,16 @@ async function blobBytes(b) { return new Uint8Array(await b.arrayBuffer()); }
 
 window.PlanerBoard = { create, normItem, normDoc, renderNote, toggleTodoLine };
 
+// Последние выбранные инструмент, цвет и толщина пера (только удобство этого компьютера).
+function loadInkPrefs() {
+  let p = {};
+  try { p = JSON.parse(localStorage.getItem('planer-ink') || '{}') || {}; } catch (_) { p = {}; }
+  return { tool: INK_TOOLS[p.tool] ? p.tool : 'pen', color: INK_COLORS.includes(p.color) ? p.color : 'ink', size: INK_SIZES[p.size] ? p.size : 'm' };
+}
+
 function create(ctx) {
   const { h, icon, toast } = ctx;
+  const inkPrefs = loadInkPrefs();
   Object.assign(ctx.IC, ICONS, (window.PlanerSketch && window.PlanerSketch.ICONS) || {});
   const E = ctx.electron || null, M = E && E.media ? E.media : null;
   const SK = () => window.PlanerSketch || null;
@@ -399,7 +472,7 @@ function create(ctx) {
     B.emptyEl = h('div', { class: 'bd-emptyhint' },
       h('div', { class: 'bd-emptyhint-ico' }, icon('board', 30)),
       h('b', {}, 'Доска пока пуста'),
-      h('span', {}, 'Дважды щёлкните по холсту, чтобы добавить заметку, или перетащите сюда фото и видео.'));
+      h('span', {}, 'Дважды щёлкните по холсту, чтобы добавить заметку, перетащите сюда фото и видео или нажмите «Рисовать» и рисуйте прямо здесь.'));
     B.dropHint = h('div', { class: 'bd-drophint', hidden: true }, h('span', {}, icon('image', 18), 'Отпустите, чтобы добавить на доску'));
     B.progEl = h('div', { class: 'bd-progress', hidden: true, role: 'status', 'aria-live': 'polite' }, h('span', { class: 'bd-progress-t' }), h('div', { class: 'bar' }, h('i')));
     B.zoomLbl = h('button', { class: 'bd-zoom-lbl', type: 'button', title: 'Масштаб 100% (Shift+0)', 'aria-label': 'Масштаб 100%', onclick: () => zoomTo(1) }, '100%');
@@ -409,11 +482,16 @@ function create(ctx) {
       h('button', { type: 'button', class: 'bd-zb', 'aria-label': 'Увеличить (+)', title: 'Увеличить (+)', onclick: () => zoomStep(1.25) }, icon('plus', 16)),
       h('span', { class: 'bd-zsep' }),
       h('button', { type: 'button', class: 'bd-zb', 'aria-label': 'Показать всё (Shift+1)', title: 'Показать всё (Shift+1)', onclick: () => fitAll(true) }, icon('fit', 16)));
+    B.inkLive = svgEl('svg', { class: 'bd-ink-live', 'aria-hidden': 'true' });
+    B.world.append(B.inkLive);
+    B.inkBar = h('div', { class: 'bd-inkbar', role: 'toolbar', 'aria-label': 'Рисование', hidden: true });
     B.vp = h('div', { class: 'bd-vp', tabindex: '0', role: 'application', 'aria-label': 'Холст доски. Двойной щелчок — новая заметка.', 'aria-roledescription': 'холст' },
-      B.world, B.marquee, B.emptyEl, B.dropHint, B.progEl, zoom);
+      B.world, B.marquee, B.emptyEl, B.dropHint, B.progEl, zoom, B.inkBar);
+    B.drawBtn = railBtn('pen', 'Рисовать', () => toggleDraw(), { 'aria-pressed': 'false', title: 'Рисовать от руки прямо на доске (P)' });
     const rail = h('nav', { class: 'bd-rail', 'aria-label': 'Добавить на доску' },
       railBtn('note', 'Заметка', () => addNoteAt(null, '', true)),
       railBtn('todo', 'Чек-лист', () => addChecklistAt(null)),
+      B.drawBtn,
       railBtn('image', 'Фото / видео', () => { if (!M) { toast('Фото и видео можно добавлять в настольной версии приложения.'); return; } B.fileIn.click(); }),
       railBtn('brush', 'Зарисовка', () => newSketch()),
       railBtn('link', 'Ссылка', () => addLinkDraft()),
@@ -426,7 +504,7 @@ function create(ctx) {
         h('div', { class: 'bd-top-tools' }, B.undoBtn, B.redoBtn, h('span', { class: 'bd-tsep' }), aiBtn, topTool('x', 'Закрыть доску (Esc)', () => close()))),
       h('div', { class: 'bd-main' }, rail, B.vp),
       h('footer', { class: 'bd-foot' },
-        h('span', {}, 'Двойной щелчок — заметка · Перетаскивание пустого места — перемещение · ', h('kbd', {}, 'Shift'), '+перетаскивание — выделение · ', h('kbd', {}, 'Ctrl'), '+колесо — масштаб'),
+        h('span', {}, 'Двойной щелчок — заметка · ', h('kbd', {}, 'P'), ' — рисовать · ', h('kbd', {}, 'Shift'), '+перетаскивание — выделение · ', h('kbd', {}, 'Ctrl'), '+колесо — масштаб'),
         h('span', {}, h('kbd', {}, 'Ctrl+Z'), ' отмена · ', h('kbd', {}, 'Ctrl+D'), ' копия · ', h('kbd', {}, 'Del'), ' удалить')));
     B.ov = h('div', { class: 'bd-ov' }, B.sheet);
     B.ov.addEventListener('mousedown', e => { if (e.target === B.ov) close(); });
@@ -527,6 +605,7 @@ function create(ctx) {
     el.style.width = it.w + 'px';
     el.style.zIndex = String(it.z);
     if (isMediaType(it.type)) { const m = el.querySelector('.bd-media'); if (m) m.style.height = it.h + 'px'; el.style.minHeight = ''; }
+    else if (it.type === 'ink') { el.style.height = it.h + 'px'; el.style.minHeight = ''; }
     else el.style.minHeight = it.h + 'px';
   }
   function buildCard(it) {
@@ -544,6 +623,7 @@ function create(ctx) {
     if (it.type === 'note') kids.push(editing ? noteEditor(it) : noteView(it));
     else if (it.type === 'checklist') kids.push(editing ? checklistEditor(it) : checklistView(it));
     else if (it.type === 'link') kids.push(editing ? linkEditor(it) : linkView(it));
+    else if (it.type === 'ink') kids.push(inkView(it));
     else {
       kids.push(it.type === 'image' ? imageView(it) : it.type === 'video' ? videoView(it) : sketchView(it));
       if (editing) kids.push(captionEditor(it));
@@ -564,6 +644,20 @@ function create(ctx) {
     }
   }
 
+  // Рисунок от руки: SVG в координатах самого рисунка (vw×vh), растягивается до размера карточки.
+  // Щёлкнуть по рисунку можно только по линиям (невидимая широкая «линия попадания»), сквозь пустоту — карточки под ним.
+  const SVGNS = 'http://www.w3.org/2000/svg';
+  function svgEl(tag, attrs) { const e = document.createElementNS(SVGNS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; }
+  function inkView(it) {
+    const sv = svgEl('svg', { class: 'bd-ink', viewBox: '0 0 ' + it.vw + ' ' + it.vh, preserveAspectRatio: 'none', 'aria-hidden': 'true' });
+    const k = it.w / it.vw;
+    for (const s of it.strokes) {
+      const d = inkPath(s.p);
+      sv.append(svgEl('path', { class: 'bd-ink-hit', d, 'stroke-width': String(Math.max(s.w, 12 / k)) }),
+        svgEl('path', { class: 'bd-ink-p ink-c-' + s.c + (s.m ? ' marker' : ''), d, 'stroke-width': String(s.w) }));
+    }
+    return sv;
+  }
   function noteView(it) {
     const v = h('div', { class: 'bd-note' });
     if (it.text.trim()) renderNote(v, it.text, h, icon); else v.append(h('div', { class: 'bd-ph' }, 'Пустая заметка'));
@@ -1066,9 +1160,14 @@ function create(ctx) {
     const vp = B.vp;
     if (e.button === 1 || (e.button === 0 && B.spaceDown)) { e.preventDefault(); startPan(e, false); return; }
     if (e.button !== 0) return;
+    if (B.draw && !e.target.closest('.bd-zoom, .bd-progress, .bd-inkbar')) {      // режим рисования: перо, маркер, ластик
+      e.preventDefault(); vp.focus({ preventScroll: true }); exitEdit();
+      if (B.draw.tool === 'eraser') startErase(e); else startInk(e);
+      return;
+    }
     const card = e.target.closest('.bd-card');
     if (!card) {
-      if (e.target.closest('.bd-zoom, .bd-progress')) return;
+      if (e.target.closest('.bd-zoom, .bd-progress, .bd-inkbar')) return;
       if (!isTyping(e.target)) { e.preventDefault(); vp.focus({ preventScroll: true }); }
       if (e.shiftKey || e.ctrlKey || e.metaKey) startMarquee(e, e.shiftKey);
       else startPan(e, true);
@@ -1167,8 +1266,8 @@ function create(ctx) {
     const sx = e.clientX, sy = e.clientY, z = B.doc.view.zoom, w0 = it.w, h0 = it.h;
     const el = B.els.get(it.id);
     const h0real = el ? (isMediaType(it.type) ? it.h : el.offsetHeight) : it.h;
-    const ratio = isMediaType(it.type) ? it.h / it.w : 0;
-    const minW = it.type === 'link' ? 200 : isMediaType(it.type) ? 60 : 140;
+    const ratio = isMediaType(it.type) || it.type === 'ink' ? it.h / it.w : 0;     // картинки и рисунки — без искажения
+    const minW = it.type === 'link' ? 200 : isMediaType(it.type) ? 60 : it.type === 'ink' ? 12 : 140;
     const before = snap();
     let moved = false;
     exitEdit();
@@ -1176,7 +1275,7 @@ function create(ctx) {
       moved = true;
       const dw = (ev.clientX - sx) / z, dh = (ev.clientY - sy) / z;
       it.w = Math.round(clampN(w0 + dw, minW, 4000));
-      if (ratio) it.h = Math.max(30, Math.round(it.w * ratio));
+      if (ratio) it.h = Math.max(it.type === 'ink' ? 4 : 30, Math.round(it.w * ratio));
       else if (it.type !== 'link') it.h = Math.round(clampN(h0real + dh, 40, 4000));
       if (el) place(el, it);
     }, () => {
@@ -1186,7 +1285,7 @@ function create(ctx) {
     });
   }
   function onDblClick(e) {
-    if (!B || B.sub) return;
+    if (!B || B.sub || B.draw) return;
     // при захвате указателя событие приходит на холст — настоящую цель находим по координатам
     const tgt = document.elementFromPoint(e.clientX, e.clientY) || e.target;
     if (!B.vp.contains(tgt)) return;
@@ -1249,7 +1348,7 @@ function create(ctx) {
       if (it.type === 'sketch') items.push({ icon: 'brush', label: 'Редактировать зарисовку', run: () => editSketch(it) });
       if (it.type === 'video') items.push({ icon: 'play', label: 'Воспроизвести', run: () => playVideo(it) }, { icon: 'ext', label: 'Открыть во внешнем плеере', run: () => openExternal(it) });
       if (isMediaType(it.type)) items.push({ icon: 'caption', label: it.caption ? 'Изменить подпись' : 'Добавить подпись', run: () => enterEdit(it.id) });
-      if ((it.type === 'image' || (it.type === 'sketch' && it.mediaId)) && M) items.push({ sep: true },
+      if ((it.type === 'image' || it.type === 'ink' || (it.type === 'sketch' && it.mediaId)) && M) items.push({ sep: true },
         { icon: 'save', label: 'Сохранить как…', run: () => exportCard(it, 'save') },
         { icon: 'copy', label: 'Копировать в буфер', run: () => exportCard(it, 'copy') });
       if (it.type === 'note' || it.type === 'checklist') items.push({ swatches: COLORS, names: COLOR_NAMES, value: it.color, pick: c => change(() => { it.color = c; }) });
@@ -1261,6 +1360,136 @@ function create(ctx) {
       { sep: true },
       { icon: 'trash', danger: true, label: multi ? 'Удалить выделенные (' + B.sel.size + ')' : 'Удалить', run: () => deleteSel() });
     ctx.openMenu(anchor, items.filter(Boolean));
+  }
+
+  /* ---------- рисование от руки прямо на холсте ---------- */
+  // Штрихи, нарисованные подряд рядом друг с другом, собираются в один «рисунок» (карточку ink): его можно двигать,
+  // масштабировать, копировать и удалять, как любую карточку. Отмена — общая история доски (Ctrl+Z).
+  function toggleDraw(on) {
+    if (!B) return;
+    const want = on === undefined ? !B.draw : !!on;
+    if (want === !!B.draw) return;
+    if (want) { exitEdit(); clearSel(); B.draw = Object.assign({ ids: [] }, inkPrefs); }
+    else B.draw = null;
+    B.vp.classList.toggle('bd-drawing', !!B.draw);
+    B.drawBtn.setAttribute('aria-pressed', String(!!B.draw));
+    B.drawBtn.classList.toggle('on', !!B.draw);
+    paintInkBar();
+    B.vp.focus({ preventScroll: true });
+  }
+  function setInk(patch) {
+    Object.assign(inkPrefs, patch);
+    try { localStorage.setItem('planer-ink', JSON.stringify(inkPrefs)); } catch (_) {}
+    if (B && B.draw) { Object.assign(B.draw, patch); paintInkBar(); }
+  }
+  function paintInkBar() {
+    if (!B) return;
+    const bar = B.inkBar, d = B.draw;
+    bar.hidden = !d;
+    B.vp.dataset.tool = d ? d.tool : '';
+    if (!d) { bar.replaceChildren(); return; }
+    const tb = (tool, keyHint) => h('button', { type: 'button', class: 'bd-ib-tool', role: 'radio', 'aria-checked': String(d.tool === tool), 'aria-label': INK_TOOLS[tool] + ' (' + keyHint + ')', title: INK_TOOLS[tool] + ' (' + keyHint + ')',
+      onclick: () => setInk({ tool }) }, icon(tool, 18));
+    bar.replaceChildren(
+      h('div', { class: 'bd-ib-grp', role: 'radiogroup', 'aria-label': 'Инструмент' }, tb('pen', 'B'), tb('marker', 'M'), tb('eraser', 'E')),
+      h('span', { class: 'bd-tsep' }),
+      h('div', { class: 'bd-ib-grp', role: 'radiogroup', 'aria-label': 'Цвет' }, INK_COLORS.map(c => h('button', { type: 'button', class: 'bd-ib-c ink-bg-' + c, role: 'radio',
+        'aria-checked': String(d.color === c), 'aria-label': INK_COLOR_NAMES[c], title: INK_COLOR_NAMES[c], disabled: d.tool === 'eraser', onclick: () => setInk({ color: c }) }))),
+      h('span', { class: 'bd-tsep' }),
+      h('div', { class: 'bd-ib-grp', role: 'radiogroup', 'aria-label': 'Толщина' }, Object.keys(INK_SIZES).map(s => h('button', { type: 'button', class: 'bd-ib-s', role: 'radio', 'data-size': s,
+        'aria-checked': String(d.size === s), 'aria-label': { s: 'Тонко', m: 'Средне', l: 'Толсто' }[s], title: { s: 'Тонко', m: 'Средне', l: 'Толсто' }[s], onclick: () => setInk({ size: s }) }, h('i')))),
+      h('span', { class: 'bd-tsep' }),
+      h('button', { type: 'button', class: 'bd-ib-done', onclick: () => toggleDraw(false), title: 'Закончить рисование (Esc)' }, 'Готово'));
+  }
+  // Промежуточные («слитые») события указателя дают плавную линию, но бывают пустыми (0, 0) — такие пропускаем.
+  function pointerSamples(ev) {
+    const evs = typeof ev.getCoalescedEvents === 'function' ? ev.getCoalescedEvents() : [];
+    const r = B.vp.getBoundingClientRect();
+    const ok = evs.filter(c => (c.clientX || c.clientY) && c.clientX >= r.left - 40 && c.clientX <= r.right + 40 && c.clientY >= r.top - 40 && c.clientY <= r.bottom + 40);
+    return ok.length ? ok : [ev];
+  }
+  const inkWidth = d => (INK_SIZES[d.size] || 4) * (d.tool === 'marker' ? 3.5 : 1) / B.doc.view.zoom;
+  function startInk(e) {
+    const d = B.draw, z = B.doc.view.zoom, w = inkWidth(d), marker = d.tool === 'marker';
+    const pts = [];
+    const add = ev => {
+      const p = toWorld(ev.clientX, ev.clientY), n = pts.length;
+      if (n >= 2 && Math.hypot(p.x - pts[n - 2], p.y - pts[n - 1]) < 0.6 / z) return;
+      if (n < 16000) pts.push(r1(p.x), r1(p.y));
+    };
+    add(e);
+    const path = svgEl('path', { class: 'bd-ink-p ink-c-' + d.color + (marker ? ' marker' : ''), 'stroke-width': String(w) });
+    B.inkLive.append(path);
+    let raf = 0;
+    const paint = () => { raf = 0; path.setAttribute('d', inkPath(pts)); };
+    paint();
+    capture(e, ev => {
+      pointerSamples(ev).forEach(add);
+      if (!raf) raf = requestAnimationFrame(paint);
+    }, () => {
+      cancelAnimationFrame(raf); path.remove();
+      if (!B || !B.draw) return;
+      commitInk({ c: d.color, w: r1(w), m: marker ? 1 : 0, p: simplify(pts, 0.35 / z) });
+    });
+  }
+  function commitInk(stroke) {
+    const p = stroke.p, pad = stroke.w / 2 + 2;
+    let x1 = Infinity, y1 = Infinity, x2 = -Infinity, y2 = -Infinity;
+    for (let i = 0; i < p.length; i += 2) { x1 = Math.min(x1, p[i]); y1 = Math.min(y1, p[i + 1]); x2 = Math.max(x2, p[i]); y2 = Math.max(y2, p[i + 1]); }
+    const sb = { x: Math.floor(x1 - pad), y: Math.floor(y1 - pad), x2: Math.ceil(x2 + pad), y2: Math.ceil(y2 + pad) };
+    // штрих присоединяется к рисунку этого сеанса, рядом с которым нарисован (ближе 60 px на экране); иначе — новый рисунок
+    const near = 60 / B.doc.view.zoom;
+    const hit = it => it && it.type === 'ink' && sb.x < it.x + it.w + near && sb.x2 > it.x - near && sb.y < it.y + it.h + near && sb.y2 > it.y - near;
+    const target = B.draw.ids.slice().reverse().map(itemById).find(hit) || null;
+    const clean = s => { const o = { c: s.c, w: s.w, p: s.p }; if (s.m) o.m = 1; return o; };
+    let id;
+    change(() => {
+      if (target) {
+        const k = target.w / target.vw;
+        const nx = Math.min(target.x, sb.x), ny = Math.min(target.y, sb.y);
+        const nx2 = Math.max(target.x + target.w, sb.x2), ny2 = Math.max(target.y + target.h, sb.y2);
+        const dx = (target.x - nx) / k, dy = (target.y - ny) / k;
+        if (dx || dy) target.strokes.forEach(s => { for (let i = 0; i < s.p.length; i += 2) { s.p[i] = r1(s.p[i] + dx); s.p[i + 1] = r1(s.p[i + 1] + dy); } });
+        const local = []; for (let i = 0; i < p.length; i += 2) local.push(r1((p[i] - nx) / k), r1((p[i + 1] - ny) / k));
+        target.strokes.push(clean({ c: stroke.c, w: r1(stroke.w / k), m: stroke.m, p: local }));
+        target.x = nx; target.y = ny; target.w = nx2 - nx; target.h = ny2 - ny;
+        target.vw = r1(target.w / k); target.vh = r1(target.h / k);
+        id = target.id;
+      } else {
+        const local = []; for (let i = 0; i < p.length; i += 2) local.push(r1(p[i] - sb.x), r1(p[i + 1] - sb.y));
+        const w = sb.x2 - sb.x, hh = sb.y2 - sb.y;
+        const it = { id: rid(), type: 'ink', x: sb.x, y: sb.y, w, h: hh, z: maxZ() + 1, vw: w, vh: hh, strokes: [clean(Object.assign({}, stroke, { p: local }))] };
+        B.doc.items.push(it); id = it.id;
+      }
+    });
+    if (B && B.draw) { B.draw.ids = B.draw.ids.filter(x => x !== id && itemById(x)); B.draw.ids.push(id); }
+  }
+  // Ластик стирает штрихи, которых касается (целиком); пустые рисунки исчезают. Вся «протирка» — один шаг отмены.
+  function startErase(e) {
+    const before = snap(), r = 9 / B.doc.view.zoom;
+    let removed = 0;
+    const erase = ev => {
+      const p = toWorld(ev.clientX, ev.clientY);
+      for (const it of B.doc.items.slice()) {
+        if (it.type !== 'ink' || p.x < it.x - r || p.y < it.y - r || p.x > it.x + it.w + r || p.y > it.y + it.h + r) continue;
+        const k = it.w / it.vw, lx = (p.x - it.x) / k, ly = (p.y - it.y) / k;
+        const keep = it.strokes.filter(s => !strokeHits(s, lx, ly, r / k));
+        if (keep.length === it.strokes.length) continue;
+        removed += it.strokes.length - keep.length;
+        if (keep.length) it.strokes = keep; else B.doc.items.splice(B.doc.items.indexOf(it), 1);
+      }
+    };
+    erase(e);
+    if (removed) renderAll();
+    capture(e, ev => {
+      const n = removed;
+      pointerSamples(ev).forEach(erase);
+      if (removed !== n) renderAll();
+    }, () => {
+      if (!B || !removed) return;
+      pushHistory(before); scheduleSave(B.taskId); paintEmpty(); paintCtxBar();
+      if (B.draw) B.draw.ids = B.draw.ids.filter(x => itemById(x));
+    });
   }
 
   /* ---------- операции над выделенным ---------- */
@@ -1329,10 +1558,15 @@ function create(ctx) {
       e.preventDefault(); e.stopPropagation();
       if (B.editingId) { exitEdit(); return; }
       if (typing) { B.vp.focus({ preventScroll: true }); return; }
+      if (B.draw) { toggleDraw(false); return; }
       close(); return;
     }
     if (typing) return;
     const stop = () => { e.preventDefault(); e.stopPropagation(); };
+    if (!mod && !e.altKey && e.code === 'KeyP') { stop(); toggleDraw(); return; }
+    if (B.draw && !mod && !e.altKey && (e.code === 'KeyE' || e.code === 'KeyM' || e.code === 'KeyB')) {   // E — ластик, M — маркер, B — перо
+      stop(); setInk({ tool: e.code === 'KeyE' ? 'eraser' : e.code === 'KeyM' ? 'marker' : 'pen' }); return;
+    }
     if (mod && e.code === 'KeyZ') { stop(); if (e.shiftKey) redo(); else undo(); return; }
     if (mod && e.code === 'KeyY') { stop(); redo(); return; }
     if (mod && e.code === 'KeyD') { stop(); duplicate(); return; }
@@ -1480,7 +1714,7 @@ function create(ctx) {
 
   /* ---------- экспорт картинок: PNG в файл / в буфер, JPEG для ассистента ---------- */
   async function composite(it, maxSide) {
-    let W, H, base = null, over = null;
+    let W, H, base = null, over = null, inkK = 1;
     if (it.type === 'image') {
       base = await loadImg(mediaUrl(it.mediaId));
       W = base.naturalWidth || it.width || 800; H = base.naturalHeight || it.height || 600;
@@ -1488,15 +1722,24 @@ function create(ctx) {
     } else if (it.type === 'sketch') {
       W = it.width; H = it.height;
       if (it.mediaId) over = await loadImg(mediaUrl(it.mediaId));
+    } else if (it.type === 'ink') {
+      inkK = Math.min(4, Math.max(1, 1600 / Math.max(it.vw, it.vh)));      // рисунок — векторы: рисуем в хорошем разрешении
+      W = Math.round(it.vw * inkK); H = Math.round(it.vh * inkK);
     } else throw new Error('not an image');
     const k = Math.min(1, (maxSide || 8192) / Math.max(W, H));
     const c = document.createElement('canvas');
     c.width = Math.max(1, Math.round(W * k)); c.height = Math.max(1, Math.round(H * k));
     const g = c.getContext('2d');
     if (it.type === 'sketch' && SK()) SK().drawBackground(g, it.bg, c.width, c.height, k);
+    if (it.type === 'ink') { g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); drawInk(g, it, inkK * k); }
     if (base) g.drawImage(base, 0, 0, c.width, c.height);
     if (over) g.drawImage(over, 0, 0, c.width, c.height);
     return c;
+  }
+  function drawInk(g, it, scale) {
+    g.save(); g.scale(scale, scale); g.lineCap = 'round'; g.lineJoin = 'round';
+    for (const st of it.strokes) { g.globalAlpha = st.m ? 0.35 : 1; g.strokeStyle = INK_HEX[st.c] || INK_HEX.ink; g.lineWidth = st.w; g.stroke(new Path2D(inkPath(st.p))); }
+    g.restore();
   }
   async function exportCard(it, how) {
     try {
@@ -1506,7 +1749,7 @@ function create(ctx) {
       const bytes = await blobBytes(b);
       if (how === 'copy') { const ok = await M.copyPng(bytes); toast(ok ? 'Изображение скопировано в буфер обмена' : 'Не удалось скопировать изображение.'); }
       else {
-        const r = await M.savePng(it.type === 'sketch' ? 'Зарисовка' : (it.name || 'Изображение'), bytes);
+        const r = await M.savePng(it.type === 'sketch' ? 'Зарисовка' : it.type === 'ink' ? 'Рисунок' : (it.name || 'Изображение'), bytes);
         if (r && r.ok) toast('Сохранено: ' + r.path); else if (r && !r.canceled) toast(r.error || 'Не удалось сохранить файл.');
       }
     } catch (_) { toast('Не удалось подготовить изображение — возможно, файл повреждён или удалён.'); }
@@ -1600,6 +1843,7 @@ function create(ctx) {
       if (it.type === 'note') { o.text = it.text; if (it.color) o.color = it.color; }
       else if (it.type === 'checklist') { o.title = it.title; o.items = it.items.map(x => ({ text: x.text, done: x.done })); }
       else if (it.type === 'link') { o.url = it.url; if (it.title || it.ptitle) o.title = it.title || it.ptitle; if (it.desc) o.description = it.desc; if (it.site) o.site = it.site; }
+      else if (it.type === 'ink') { o.drawing = 'нарисовано от руки на доске'; o.strokes = it.strokes.length; o.colors = [...new Set(it.strokes.map(s => INK_COLOR_NAMES[s.c]))]; }
       else {
         if (it.name) o.file = it.name;
         if (it.caption) o.caption = it.caption;
@@ -1645,7 +1889,29 @@ function create(ctx) {
   }
   function onTaskText(taskId, text) { if (B && B.taskId === taskId && document.activeElement !== B.titleIn) B.titleIn.value = text; }
   function onTaskGone(taskId) { if (B && B.taskId === taskId) close(); }
+  // Найденная поиском карточка: выделить и показать в центре экрана.
+  function reveal(cardId) {
+    const it = itemById(cardId); if (!B || !it) return false;
+    exitEdit(); selectOnly(it.id);
+    const r = B.vp.getBoundingClientRect(), rc = rectOf(it), v = B.doc.view;
+    const z = clampN(Math.min(v.zoom, (r.width - 80) / Math.max(rc.w, 1), (r.height - 80) / Math.max(rc.h, 1)), 0.25, ZMAX);
+    B.doc.view = { x: Math.round(r.width / 2 - (rc.x + rc.w / 2) * z), y: Math.round(r.height / 2 - (rc.y + rc.h / 2) * z), zoom: z };
+    applyView();
+    const el = B.els.get(it.id);
+    if (el) { el.classList.remove('bd-flash'); void el.offsetWidth; el.classList.add('bd-flash'); el.focus({ preventScroll: true }); }
+    return true;
+  }
+  // Забыть загруженную доску (после восстановления из копии): следующее открытие прочитает её заново.
+  // Возвращает true, если доска была открыта (её закрыли без сохранения поверх восстановленной версии).
+  function forget(taskId) {
+    clearTimeout(saveTimers.get(taskId)); saveTimers.delete(taskId);
+    docs.delete(taskId); loading.delete(taskId); histories.delete(taskId);
+    ctx.pending('board-' + taskId, false);
+    const wasOpen = !!B && B.taskId === taskId;
+    if (wasOpen) close();                       // close() не сохранит: документа уже нет в кэше
+    return wasOpen;
+  }
 
-  return { open, close, isOpen, openTaskId, flush, readBoard, addCard, findCard, imageForAI, onTaskText, onTaskGone, thumbUrl, mediaUrl };
+  return { open, close, isOpen, openTaskId, flush, readBoard, addCard, findCard, imageForAI, onTaskText, onTaskGone, thumbUrl, mediaUrl, reveal, forget };
 }
 })();

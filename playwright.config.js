@@ -11,7 +11,7 @@ module.exports = defineConfig({
   outputDir: 'test-results',
   globalSetup: require.resolve('./tests/global-setup.js'),
   projects: [
-    { name: 'app', testIgnore: /packaged\.spec\.js/ },
+    { name: 'app', testIgnore: [/packaged\.spec\.js/, /[\\/]unit[\\/]/] },   // tests/unit — модульные тесты node --test
     { name: 'packaged', testMatch: /packaged\.spec\.js/ }
   ]
 });

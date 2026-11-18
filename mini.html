@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Планер — сегодня</title>
+<link rel="stylesheet" href="src/tokens.css">
+<link rel="stylesheet" href="src/mini.css">
+</head>
+<body>
+<div class="mn" id="mini">
+  <header class="mn-head">
+    <div class="mn-titles"><b>Сегодня</b><span id="mnDate"></span></div>
+    <button class="mn-tool" id="mnOpen" type="button" title="Открыть Планер" aria-label="Открыть Планер"></button>
+    <button class="mn-tool" id="mnClose" type="button" title="Скрыть (Esc)" aria-label="Скрыть"></button>
+  </header>
+  <div class="mn-prog"><div class="mn-bar"><i id="mnBar"></i></div><span id="mnCount"></span></div>
+  <section class="mn-timers" id="mnTimers" aria-label="Таймеры"></section>
+  <div class="mn-list" id="mnList" role="list" aria-label="Задачи на сегодня"></div>
+  <form class="mn-add" id="mnForm">
+    <input id="mnInput" type="text" maxlength="500" autocomplete="off" placeholder="Новая задача на сегодня (!!! — срочно)" aria-label="Новая задача на сегодня">
+  </form>
+</div>
+<script src="src/core.js"></script>
+<script src="src/mini.js"></script>
+</body>
+</html>

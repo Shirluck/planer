@@ -1,12 +1,16 @@
 // Основной процесс: окно, хранение данных (документы + медиа), ассистент (подписка Claude через Claude Code
-// или ключ API Anthropic), превью ссылок, трей.
-const { app, BrowserWindow, Menu, Tray, ipcMain, shell, safeStorage, protocol, dialog, clipboard, nativeImage } = require('electron');
+// или ключ API Anthropic), превью ссылок, трей и мини-окно «Сегодня», таймеры, оформление, автозапуск, резервные копии.
+// @ts-check
+const { app, BrowserWindow, Menu, Tray, ipcMain, shell, safeStorage, protocol, dialog, clipboard, nativeImage, nativeTheme, Notification, screen, powerMonitor } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { createStore, writeAtomic } = require('./lib/store');
 const { createMedia, sniff } = require('./lib/media');
 const { createLinkPreview } = require('./lib/linkpreview');
 const { createClaudeCode } = require('./lib/claudecode');
+const { createTimers } = require('./lib/timers');
+const { createBackups } = require('./lib/backups');
+const { fmtClock, fmtDuration } = require('./src/core.js');
 
 // Одинаковая папка данных и в режиме разработки, и в собранном приложении:
 //   Windows: %APPDATA%\Planer     macOS: ~/Library/Application Support/Planer     Linux: ~/.config/Planer
@@ -22,11 +26,19 @@ const isMac = process.platform === 'darwin';
 const dir = () => app.getPath('userData');
 const keyFile = () => path.join(dir(), 'api-key.bin');
 const iconFile = path.join(__dirname, 'build', 'icon.png');
+/** @type {BrowserWindow|null} */
 let win = null;
-let store = null, media = null, linkPreview = null, claudeCode = null;
+/** @type {BrowserWindow|null} */
+let mini = null;
+let store = null, media = null, linkPreview = null, claudeCode = null, timers = null, backups = null;
 const notices = [];
+const TIMERS_DOC = 'data/users/local/planner-timers';
+const startHidden = process.argv.includes('--hidden');   // автозапуск с Windows: сразу в трей, без окна
 
+/** @param {string} channel @param {...any} args */
 function sendToPage(channel, ...args) { if (win && !win.isDestroyed()) win.webContents.send(channel, ...args); }
+/** Сообщение всем окнам Планера (главному и мини-окну). @param {string} channel @param {...any} args */
+function broadcast(channel, ...args) { for (const w of [win, mini]) if (w && !w.isDestroyed()) w.webContents.send(channel, ...args); }
 
 /* ---------- данные ---------- */
 function initStorage() {
@@ -43,6 +55,13 @@ function initStorage() {
   media = createMedia(dir(), { nativeImage });
   linkPreview = createLinkPreview({ media, allowLocal: process.env.PLANER_ALLOW_LOCAL_PREVIEW === '1' });
   claudeCode = createClaudeCode({ workDir: path.join(dir(), 'claude-work'), getCustomPath: () => readSettings().claudePath || null });
+  backups = createBackups({ dir: dir(), store });
+  timers = createTimers({
+    load: () => store.get(TIMERS_DOC),
+    save: d => store.set(TIMERS_DOC, d),
+    onChange: st => { broadcast('timer:state', st); updateTray(true); },
+    onDone: timerDone
+  });
   store.dailyBackup();
 }
 
@@ -76,6 +95,144 @@ function setAi(patch) {
 }
 ipcMain.handle('ai:get', () => aiState());
 ipcMain.handle('ai:set', (_e, patch) => setAi(patch));
+
+/* ---------- оформление: тема, размер интерфейса, компактный режим ---------- */
+// settings.json: { theme: 'system' | 'light' | 'dark', zoom: 0.8…1.5, compact: boolean }
+const THEMES = ['system', 'light', 'dark'];
+const ZOOMS = [0.8, 0.9, 1, 1.1, 1.25, 1.4, 1.5];
+function uiState() {
+  const s = readSettings();
+  const zoom = ZOOMS.includes(s.zoom) ? s.zoom : 1;
+  return { theme: THEMES.includes(s.theme) ? s.theme : 'system', zoom, compact: !!s.compact, dark: nativeTheme.shouldUseDarkColors };
+}
+const themeBg = () => nativeTheme.shouldUseDarkColors ? '#131210' : '#f3f1ec';
+function applyUi() {
+  const st = uiState();
+  nativeTheme.themeSource = /** @type {'system'|'light'|'dark'} */ (st.theme);
+  for (const w of [win, mini]) if (w && !w.isDestroyed()) w.setBackgroundColor(themeBg());
+  if (win && !win.isDestroyed()) win.webContents.setZoomFactor(st.zoom);
+  return st;
+}
+/** @param {any} patch */
+function setUi(patch) {
+  const p = {};
+  if (patch && THEMES.includes(patch.theme)) p.theme = patch.theme;
+  if (patch && ZOOMS.includes(patch.zoom)) p.zoom = patch.zoom;
+  if (patch && typeof patch.compact === 'boolean') p.compact = patch.compact;
+  if (Object.keys(p).length) writeSettings(p);
+  applyUi(); buildMenu();
+  const st = uiState();
+  broadcast('ui:state', st);
+  return st;
+}
+/** Крупнее (+1), мельче (−1) или обычный размер (0). @param {number} dir */
+function zoomStep(dir) {
+  const i = ZOOMS.indexOf(uiState().zoom);
+  return setUi({ zoom: dir === 0 ? 1 : ZOOMS[Math.min(ZOOMS.length - 1, Math.max(0, i + dir))] });
+}
+ipcMain.handle('ui:get', () => uiState());
+ipcMain.handle('ui:set', (_e, patch) => setUi(patch));
+nativeTheme.on('updated', () => { for (const w of [win, mini]) if (w && !w.isDestroyed()) w.setBackgroundColor(themeBg()); broadcast('ui:state', uiState()); });
+
+/* ---------- автозапуск вместе с Windows (сразу в трей) ---------- */
+// В автотестах (PLANER_TEST) системный автозапуск не трогаем — только запоминаем, что было бы записано.
+let testLoginItem = null;
+function loginItemTarget() {
+  const exe = process.env.PORTABLE_EXECUTABLE_FILE || process.execPath;     // portable-версия распаковывается во временную папку
+  return { path: exe, args: app.isPackaged ? ['--hidden'] : [app.getAppPath(), '--hidden'] };
+}
+function autostartState() {
+  const available = process.platform === 'win32' || isMac;
+  return { enabled: !!readSettings().autostart && available, available, portable: !!process.env.PORTABLE_EXECUTABLE_FILE };
+}
+/** @param {boolean} on */
+function setAutostart(on) {
+  if (!autostartState().available) return autostartState();
+  writeSettings({ autostart: !!on });
+  const t = loginItemTarget();
+  const opts = { openAtLogin: !!on, path: t.path, args: t.args };
+  if (process.env.PLANER_TEST) testLoginItem = opts;
+  else { try { app.setLoginItemSettings(opts); } catch (e) { console.error('autostart:', e); } }
+  buildMenu(); updateTray(true);
+  const r = autostartState();
+  broadcast('autostart:state', r);
+  return r;
+}
+ipcMain.handle('autostart:get', () => autostartState());
+ipcMain.handle('autostart:set', (_e, on) => setAutostart(on === true));
+
+/* ---------- таймеры (lib/timers.js) ---------- */
+let lastDone = null;
+/** @param {any} r */
+function timerDone(r) {
+  broadcast('timer:done', { id: r.id, presetId: r.presetId, title: r.title, ms: r.ms });
+  lastDone = { title: r.title, at: Date.now() };
+  if (Notification.isSupported() && !process.env.PLANER_TEST) {
+    try {
+      const n = new Notification({ title: 'Таймер «' + r.title + '» закончился', body: fmtDuration(r.ms) + ' · нажмите, чтобы открыть Планер', silent: true,
+        icon: fs.existsSync(iconFile) ? nativeImage.createFromPath(iconFile) : undefined });
+      n.on('click', () => showWindow());
+      n.show();
+    } catch (e) { console.error('notification:', e); }
+  }
+  updateTray(true);
+}
+ipcMain.handle('timer:state', () => timers.state());
+ipcMain.handle('timer:start', (_e, a) => timers.start(a && typeof a === 'object' ? { presetId: a.presetId, title: a.title, ms: a.ms } : {}));
+ipcMain.handle('timer:pause', (_e, id) => timers.pause(id));
+ipcMain.handle('timer:resume', (_e, id) => timers.resume(id));
+ipcMain.handle('timer:stop', (_e, id) => timers.stop(id));
+ipcMain.handle('timer:stopAll', () => timers.stopAll());
+ipcMain.handle('timer:add', (_e, id, ms) => timers.add(id, ms));
+ipcMain.handle('timer:setPresets', (_e, list) => timers.setPresets(list));
+ipcMain.handle('timer:setSound', (_e, s) => timers.setSound(s));
+
+/* ---------- резервные копии и восстановление (lib/backups.js) ---------- */
+ipcMain.handle('backup:list', () => backups.list());
+ipcMain.handle('backup:read', (_e, id, p) => { try { return backups.read(id, p); } catch (_) { return null; } });
+ipcMain.handle('backup:restore', (_e, id, paths) => {
+  let r;
+  try { r = backups.restore(id, paths); } catch (_) { return { ok: false, error: 'Неверная копия или документ.' }; }
+  if (r.ok && r.restored.includes(TIMERS_DOC)) timers.reload();
+  return r;
+});
+ipcMain.handle('backup:snapshot', () => { try { return { ok: true, ...backups.snapshot('manual') }; } catch (e) { return { ok: false, error: String((e && e.message) || e) }; } });
+ipcMain.handle('backup:openFolder', () => { fs.mkdirSync(backups.backupsDir, { recursive: true }); shell.openPath(backups.backupsDir); return true; });
+
+/* ---------- мини-окно «Сегодня»: данные — у главного окна (там живёт состояние), здесь только пересылка ---------- */
+const relayWait = new Map();
+let relaySeq = 0;
+/** @param {string} op @param {any} args */
+function askMainPage(op, args) {
+  return new Promise((resolve, reject) => {
+    if (!win || win.isDestroyed() || win.webContents.isLoading()) { reject(new Error('main window not ready')); return; }
+    const id = ++relaySeq;
+    const t = setTimeout(() => { relayWait.delete(id); reject(new Error('timeout')); }, 4000);
+    relayWait.set(id, v => { clearTimeout(t); relayWait.delete(id); resolve(v); });
+    win.webContents.send('mini:op', { id, op, args });
+  });
+}
+ipcMain.on('mini:reply', (e, id, result) => { if (win && e.sender === win.webContents && relayWait.has(id)) relayWait.get(id)(result); });
+ipcMain.handle('mini:call', async (e, op, args) => {
+  if (!mini || e.sender !== mini.webContents) return { ok: false };
+  const a = args && typeof args === 'object' ? args : {};
+  let safe;
+  if (op === 'today') safe = {};
+  else if (op === 'toggle') safe = { id: String(a.id || '').slice(0, 40) };
+  else if (op === 'add') { const text = String(a.text || '').trim().slice(0, 500); if (!text) return { ok: false }; safe = { text }; }
+  else return { ok: false };
+  try { return { ok: true, data: await askMainPage(op, safe) }; } catch (_) { return { ok: false }; }
+});
+ipcMain.on('mini:changed', e => { if (win && e.sender === win.webContents && mini && !mini.isDestroyed() && mini.isVisible()) mini.webContents.send('mini:refresh'); });
+ipcMain.handle('mini:openMain', (e, what) => {
+  if (!mini || e.sender !== mini.webContents) return false;
+  mini.hide(); showWindow();
+  const w = what && typeof what === 'object' ? what : {};
+  if (w.command === 'timers' || w.command === 'search') sendToPage('app:command', w.command);
+  else if (typeof w.taskId === 'string') sendToPage('app:command', 'task', w.taskId.slice(0, 40));
+  return true;
+});
+ipcMain.handle('mini:hide', e => { if (mini && e.sender === mini.webContents) mini.hide(); return true; });
 
 /* ---------- ассистент через подписку Claude (локальный Claude Code) ---------- */
 const IMG_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
@@ -148,10 +305,11 @@ ipcMain.handle('media:copyPng', async (_e, data) => {
   const buf = toBuf(data);
   if (sniff(buf) !== 'png') return false;
   try {
-    if (typeof clipboard.writeImage === 'function') {
+    const legacy = /** @type {any} */ (clipboard);   // writeImage есть только в старых версиях Electron
+    if (typeof legacy.writeImage === 'function') {
       const img = nativeImage.createFromBuffer(buf);
       if (img.isEmpty()) return false;
-      clipboard.writeImage(img);
+      legacy.writeImage(img);
     } else {
       const { ClipboardItem } = require('electron');
       await clipboard.write([new ClipboardItem({ 'image/png': new Blob([buf], { type: 'image/png' }) })]);
@@ -223,18 +381,28 @@ ipcMain.handle('anthropic:cancel', (_e, rid) => { const c = inflight.get(rid); i
 
 /* ---------- окно и меню ---------- */
 let quitting = false;
-function createWindow() {
-  win = new BrowserWindow({
-    width: 1500, height: 920, minWidth: 760, minHeight: 560,
-    title: 'Планер', backgroundColor: '#f3f1ec', autoHideMenuBar: true,
-    icon: fs.existsSync(iconFile) ? iconFile : undefined,
-    webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true, spellcheck: false }
-  });
-  const pageUrl = require('url').pathToFileURL(path.join(__dirname, 'index.html')).href;
-  win.loadFile(path.join(__dirname, 'index.html'));
-  win.webContents.setWindowOpenHandler(({ url }) => { if (/^https:\/\//.test(url)) shell.openExternal(url); return { action: 'deny' }; });
+const webPrefs = () => ({ preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true, spellcheck: false,
+  autoplayPolicy: /** @type {'no-user-gesture-required'} */ ('no-user-gesture-required') });   // звук таймера, даже когда окно в трее
+/** Окну нельзя уходить со своей страницы и открывать новые окна. @param {BrowserWindow} w @param {string} file */
+function lockNavigation(w, file) {
+  const pageUrl = require('url').pathToFileURL(path.join(__dirname, file)).href;
+  w.webContents.setWindowOpenHandler(({ url }) => { if (/^https:\/\//.test(url)) shell.openExternal(url); return { action: 'deny' }; });
   // Никаких переходов со страницы (в том числе при случайном перетаскивании файла в окно).
-  win.webContents.on('will-navigate', (e, url) => { if (url.split('#')[0] !== pageUrl) e.preventDefault(); });
+  w.webContents.on('will-navigate', (e, url) => { if (url.split('#')[0] !== pageUrl) e.preventDefault(); });
+}
+function createWindow() {
+  const show = !(startHidden && tray);
+  win = new BrowserWindow({
+    width: 1500, height: 920, minWidth: 760, minHeight: 560, show,
+    title: 'Планер', backgroundColor: themeBg(), autoHideMenuBar: true,
+    icon: fs.existsSync(iconFile) ? iconFile : undefined,
+    webPreferences: webPrefs()
+  });
+  win.loadFile(path.join(__dirname, 'index.html'));
+  lockNavigation(win, 'index.html');
+  win.webContents.on('did-finish-load', () => { if (win) win.webContents.setZoomFactor(uiState().zoom); });
+  // Ctrl+колесо вне доски — размер интерфейса (на доске колесо с Ctrl меняет масштаб холста).
+  win.webContents.on('zoom-changed', (_e, d) => zoomStep(d === 'in' ? 1 : -1));
 
   // Крестик и «Свернуть» убирают окно в трей; полностью программа закрывается из меню значка в трее.
   // Перед настоящим закрытием страница дописывает несохранённые изменения.
@@ -251,7 +419,7 @@ function createWindow() {
     });
   });
   win.on('minimize', () => { if (tray && !isMac && !quitting) hideToTray(); });
-  win.on('closed', () => { win = null; });
+  win.on('closed', () => { win = null; if (mini && !mini.isDestroyed()) mini.destroy(); mini = null; });
 }
 // Страница дописывает несохранённое (ответ app:flushed или не дольше 2 секунд).
 function flushPage() {
@@ -267,7 +435,9 @@ function flushPage() {
 }
 
 /* ---------- трей ---------- */
-let tray = null, trayHintShown = false;
+/** @type {Tray|null} */
+let tray = null;
+let trayHintShown = false;
 function showWindow() {
   if (!win) { createWindow(); return; }
   if (win.isMinimized()) win.restore();
@@ -281,24 +451,95 @@ function hideToTray() {
     trayHintShown = true;
     const flag = path.join(dir(), 'tray-hint-shown');
     if (!fs.existsSync(flag)) {
-      try { tray.displayBalloon({ title: 'Планер работает в трее', content: 'Окно убрано к часам. Чтобы выйти полностью, щёлкните значок правой кнопкой → «Выйти из Планера».', iconType: 'info' }); fs.writeFileSync(flag, '1'); } catch (_) {}
+      try { tray.displayBalloon({ title: 'Планер работает в трее', content: 'Окно убрано к часам. Щелчок по значку — дела на сегодня, правая кнопка → «Выйти из Планера» — выход.', iconType: 'info' }); fs.writeFileSync(flag, '1'); } catch (_) {}
     }
   }
 }
 function quitFully() { quitting = true; app.quit(); }
+/** @param {string} cmd @param {...any} args */
+function pageCommand(cmd, ...args) { showWindow(); sendToPage('app:command', cmd, ...args); }
+
+// Подсказка у значка: идущий таймер с оставшимся временем; меню — запуск таймеров и автозапуск.
+let trayTick = null, trayMenuKey = '';
+/** @param {boolean} [menuToo] */
+function updateTray(menuToo) {
+  if (!tray || tray.isDestroyed()) return;
+  const n = timers ? timers.nearest() : null;
+  const tip = n ? 'Планер · ' + n.title + ' ' + (n.paused ? '(пауза) ' : '') + fmtClock(n.left) + (n.count > 1 ? ' · таймеров: ' + n.count : '') : 'Планер';
+  tray.setToolTip(tip);
+  if (n && !n.paused && !trayTick) trayTick = setInterval(() => updateTray(false), 1000);
+  if ((!n || n.paused) && trayTick) { clearInterval(trayTick); trayTick = null; }
+  if (menuToo) buildTrayMenu();
+}
+function buildTrayMenu() {
+  if (!tray || tray.isDestroyed()) return;
+  const st = timers ? timers.state() : { presets: [], running: [] };
+  const auto = autostartState();
+  const key = JSON.stringify([st.presets, st.running.length, auto.enabled]);
+  if (key === trayMenuKey) return;
+  trayMenuKey = key;
+  /** @type {Electron.MenuItemConstructorOptions[]} */
+  const tpl = [
+    { label: 'Сегодня…', click: () => toggleMini(true) },
+    { label: 'Открыть Планер', click: showWindow },
+    { type: 'separator' },
+    { label: 'Запустить таймер', enabled: st.presets.length > 0, submenu: st.presets.length
+      ? st.presets.map(p => ({ label: p.title + ' — ' + fmtDuration(p.ms), click: () => timers.start({ presetId: p.id }) }))
+      : [{ label: 'Нет таймеров', enabled: false }] },
+    { label: st.running.length > 1 ? 'Остановить таймеры (' + st.running.length + ')' : 'Остановить таймер', enabled: st.running.length > 0, click: () => timers.stopAll() },
+    { label: 'Таймеры…', click: () => pageCommand('timers') },
+    { type: 'separator' }
+  ];
+  if (auto.available) tpl.push({ label: 'Запускать вместе с Windows', type: 'checkbox', checked: auto.enabled, click: mi => setAutostart(mi.checked) }, { type: 'separator' });
+  tpl.push({ label: 'Выйти из Планера', click: quitFully });
+  tray.setContextMenu(Menu.buildFromTemplate(tpl));
+}
 function createTray() {
   if (!fs.existsSync(iconFile)) return;
   const img = nativeImage.createFromPath(iconFile).resize({ width: isMac ? 18 : 32, height: isMac ? 18 : 32, quality: 'best' });
   tray = new Tray(img);
   tray.setToolTip('Планер');
-  tray.setContextMenu(Menu.buildFromTemplate([
-    { label: 'Открыть Планер', click: showWindow },
-    { type: 'separator' },
-    { label: 'Выйти из Планера', click: quitFully }
-  ]));
-  tray.on('click', showWindow);
-  tray.on('double-click', showWindow);
-  global.__planerTray = { isActive: () => !!tray && !tray.isDestroyed(), show: showWindow, quit: quitFully };   // для автотестов
+  updateTray(true);
+  tray.on('click', () => toggleMini());                // щелчок — мини-окно «Сегодня»
+  tray.on('double-click', showWindow);                 // двойной щелчок — всё приложение
+  global.__planerTray = {                              // для автотестов
+    isActive: () => !!tray && !tray.isDestroyed(), show: showWindow, quit: quitFully, click: () => toggleMini(),
+    mini: () => mini, tooltip: () => trayTip(), menu: () => trayMenuLabels(), loginItem: () => testLoginItem
+  };
+}
+const trayTip = () => { const n = timers && timers.nearest(); return n ? n.title + ' ' + fmtClock(n.left) : 'Планер'; };
+const trayMenuLabels = () => { try { buildTrayMenu(); return JSON.parse(trayMenuKey); } catch (_) { return null; } };
+
+/* ---------- мини-окно «Сегодня» (щелчок по значку в трее) ---------- */
+const MINI_W = 360, MINI_H = 520;
+function createMini() {
+  mini = new BrowserWindow({
+    width: MINI_W, height: MINI_H, show: false, frame: false, resizable: false, minimizable: false, maximizable: false, fullscreenable: false,
+    skipTaskbar: true, alwaysOnTop: true, title: 'Планер — сегодня', backgroundColor: themeBg(),
+    icon: fs.existsSync(iconFile) ? iconFile : undefined, webPreferences: webPrefs()
+  });
+  mini.loadFile(path.join(__dirname, 'mini.html'));
+  lockNavigation(mini, 'mini.html');
+  mini.on('blur', () => { if (mini && Date.now() - (miniShownAt || 0) > 300 && !process.env.PLANER_MINI_KEEP) mini.hide(); });
+  mini.on('closed', () => { mini = null; });
+}
+let miniShownAt = 0;
+function placeMini() {
+  const tb = tray && !tray.isDestroyed() ? tray.getBounds() : null;
+  const pt = tb && tb.width ? { x: tb.x + tb.width / 2, y: tb.y + tb.height / 2 } : screen.getCursorScreenPoint();
+  const wa = screen.getDisplayNearestPoint({ x: Math.round(pt.x), y: Math.round(pt.y) }).workArea;
+  const x = Math.round(Math.min(Math.max(pt.x - MINI_W / 2, wa.x + 8), wa.x + wa.width - MINI_W - 8));
+  const y = pt.y > wa.y + wa.height / 2 ? wa.y + wa.height - MINI_H - 8 : wa.y + 8;
+  mini.setBounds({ x, y, width: MINI_W, height: MINI_H });
+}
+/** @param {boolean} [forceShow] */
+function toggleMini(forceShow) {
+  if (!mini || mini.isDestroyed()) createMini();
+  if (mini.isVisible() && !forceShow) { mini.hide(); return; }
+  placeMini();
+  miniShownAt = Date.now();
+  mini.show(); mini.focus();
+  mini.webContents.send('mini:refresh');
 }
 
 function showAbout() {
@@ -310,21 +551,39 @@ function showAbout() {
   });
 }
 function buildMenu() {
-  const ai = aiState();
-  const template = [
-    ...(isMac ? [{ role: 'appMenu' }] : []),
+  const ai = aiState(), ui = uiState(), auto = autostartState();
+  /** @type {Electron.MenuItemConstructorOptions[]} */
+  const view = [
+    { label: 'Найти… (Ctrl+K)', click: () => pageCommand('search') },
+    { type: 'separator' },
+    { label: 'Тема: как в системе', type: 'radio', checked: ui.theme === 'system', click: () => setUi({ theme: 'system' }) },
+    { label: 'Тема: светлая', type: 'radio', checked: ui.theme === 'light', click: () => setUi({ theme: 'light' }) },
+    { label: 'Тема: тёмная', type: 'radio', checked: ui.theme === 'dark', click: () => setUi({ theme: 'dark' }) },
+    { type: 'separator' },
+    { label: 'Компактный режим', type: 'checkbox', checked: ui.compact, click: mi => setUi({ compact: mi.checked }) },
+    { label: 'Крупнее', accelerator: 'CmdOrCtrl+=', click: () => zoomStep(1) },
+    { label: 'Мельче', accelerator: 'CmdOrCtrl+-', click: () => zoomStep(-1) },
+    { label: 'Обычный размер интерфейса (' + Math.round(ui.zoom * 100) + '%)', accelerator: 'CmdOrCtrl+0', click: () => zoomStep(0) },
+    { type: 'separator' },
+    { label: 'Настройки…', click: () => pageCommand('settings') },
+    { role: 'togglefullscreen', label: 'Во весь экран' }
+  ];
+  if (!app.isPackaged) view.push({ type: 'separator' }, { role: 'reload', label: 'Перезагрузить' }, { role: 'toggleDevTools', label: 'Инструменты разработчика' });
+  /** @type {Electron.MenuItemConstructorOptions[]} */
+  const template = [];
+  if (isMac) template.push({ role: 'appMenu' });
+  template.push(
     { label: 'Правка', submenu: [
       { role: 'undo', label: 'Отменить' }, { role: 'redo', label: 'Повторить' }, { type: 'separator' },
       { role: 'cut', label: 'Вырезать' }, { role: 'copy', label: 'Копировать' }, { role: 'paste', label: 'Вставить' },
       { role: 'selectAll', label: 'Выделить всё' }
     ] },
-    { label: 'Вид', submenu: [
-      { role: 'resetZoom', label: 'Обычный размер интерфейса' }, { role: 'zoomIn', label: 'Крупнее' }, { role: 'zoomOut', label: 'Мельче' },
-      { type: 'separator' },
-      { role: 'togglefullscreen', label: 'Во весь экран' },
-      ...(app.isPackaged ? [] : [{ type: 'separator' }, { role: 'reload', label: 'Перезагрузить' }, { role: 'toggleDevTools', label: 'Инструменты разработчика' }])
-    ] },
+    { label: 'Вид', submenu: view },
     { role: 'windowMenu', label: 'Окно' },
+    { label: 'Таймеры', submenu: [
+      { label: 'Таймеры…', click: () => pageCommand('timers') },
+      { label: 'Остановить все таймеры', click: () => timers.stopAll() }
+    ] },
     { label: 'Ассистент', submenu: [
       { label: 'Через подписку Claude (Claude Code)', type: 'radio', checked: ai.mode === 'claude-code', click: () => setAi({ mode: 'claude-code' }) },
       { label: 'Через ключ API Anthropic', type: 'radio', checked: ai.mode === 'api', click: () => setAi({ mode: 'api' }) },
@@ -336,12 +595,30 @@ function buildMenu() {
       { label: 'Создать ключ (console.anthropic.com)', click: () => shell.openExternal('https://console.anthropic.com/settings/keys') }
     ] },
     { label: 'Данные', submenu: [
+      { label: 'Восстановить из копии…', click: () => pageCommand('restore') },
+      { label: 'Сделать копию сейчас', click: () => { try { backups.snapshot('manual'); sendToPage('app:command', 'toast', 'Копия данных сделана'); } catch (e) { console.error('snapshot:', e); } } },
+      { type: 'separator' },
       { label: 'Открыть папку с данными', click: () => { try { store.flush(); } catch (_) {} shell.openPath(dir()); } },
-      { label: 'Открыть папку с резервными копиями', click: () => { const b = path.join(dir(), 'backups'); fs.mkdirSync(b, { recursive: true }); shell.openPath(b); } }
+      { label: 'Открыть папку с резервными копиями', click: () => { const b = path.join(dir(), 'backups'); fs.mkdirSync(b, { recursive: true }); shell.openPath(b); } },
+      ...(auto.available ? [{ type: /** @type {'separator'} */ ('separator') },
+        { label: 'Запускать вместе с Windows', type: /** @type {'checkbox'} */ ('checkbox'), checked: auto.enabled, click: mi => setAutostart(mi.checked) }] : [])
     ] },
     { label: 'Справка', submenu: [{ label: 'О программе', click: showAbout }, { type: 'separator' }, { label: 'Выйти из Планера', accelerator: 'CmdOrCtrl+Q', click: () => quitFully() }] }
-  ];
+  );
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+
+/* ---------- проверка собранного приложения (scripts/packaged-check.js) ---------- */
+// PLANER_SMOKE=1: дождаться загрузки окна, записать итог в <папка данных>/smoke.json и выйти. Пишет только в папку данных.
+function smokeCheck() {
+  const errors = [];
+  win.webContents.on('console-message', (/** @type {any} */ e) => { if (e && e.level === 'error') errors.push(String(e.message).slice(0, 300)); });
+  win.webContents.once('did-finish-load', () => setTimeout(async () => {
+    let page = null;
+    try { page = await win.webContents.executeJavaScript('({ cols: document.querySelectorAll(".col").length, loading: document.getElementById("board").classList.contains("loading"), core: !!window.PlanerCore, board: !!window.PlanerBoard, api: !!window.electronAPI, node: typeof require })'); } catch (e) { errors.push(String(e)); }
+    fs.writeFileSync(path.join(dir(), 'smoke.json'), JSON.stringify({ version: app.getVersion(), packaged: app.isPackaged, page, errors }));
+    quitFully();
+  }, 2500));
 }
 
 process.on('uncaughtException', e => { console.error('uncaught:', e); });
@@ -355,13 +632,20 @@ if (!app.requestSingleInstanceLock()) {
   app.setAboutPanelOptions({ applicationName: 'Планер', applicationVersion: app.getVersion() });
   app.whenReady().then(() => {
     initStorage();
+    applyUi();
     protocol.handle('media', req => media.handleRequest(req));
-    buildMenu(); createWindow();
+    buildMenu();
     try { createTray(); } catch (e) { console.error('tray:', e); tray = null; }
+    createWindow();
+    if (process.env.PLANER_SMOKE === '1') smokeCheck();
     // Сборка мусора в медиа — после запуска, в фоне.
     setTimeout(() => { media.gc(() => store.allDocTexts()).catch(e => console.error('gc:', e)); }, Number(process.env.PLANER_GC_DELAY_MS) || 8000);
+    // Программа живёт в трее днями: ежедневная копия делается и без перезапуска.
+    setInterval(() => { try { store.flush(); store.dailyBackup(); } catch (e) { console.error('backup:', e); } }, 60 * 60 * 1000);
+    // После сна компьютера таймеры, время которых вышло, срабатывают сразу.
+    powerMonitor.on('resume', () => { if (timers) timers.check(); });
     app.on('activate', () => showWindow());
   });
-  app.on('before-quit', () => { quitting = true; try { if (claudeCode) claudeCode.cancelAll(); if (store) store.flush(); if (media) media.saveIndex(); } catch (_) {} });
+  app.on('before-quit', () => { quitting = true; try { if (claudeCode) claudeCode.cancelAll(); if (timers) timers.dispose(); if (store) store.flush(); if (media) media.saveIndex(); } catch (_) {} });
   app.on('window-all-closed', () => { if (!isMac) app.quit(); });
 }

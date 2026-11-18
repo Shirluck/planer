@@ -18,7 +18,7 @@ async function launch(dataDir, opts = {}) {
   delete env.ELECTRON_RUN_AS_NODE;
   const app = opts.executablePath
     ? await _electron.launch({ executablePath: opts.executablePath, args: [], env })
-    : await _electron.launch({ args: [ROOT], cwd: ROOT, env });
+    : await _electron.launch({ args: [ROOT, ...(opts.args || [])], cwd: ROOT, env });
   const page = await app.firstWindow();
   const errors = [];
   page.on('pageerror', e => errors.push('pageerror: ' + String(e)));
