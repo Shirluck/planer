@@ -157,6 +157,7 @@ async function selectBackup(id){
     if (k === 'planner-cal') { const a = countTasks(then), c = countTasks(now); ic = 'cal'; title = 'Календарь: задачи и блоки времени'; sum = 'в копии ' + tasksWord(a.n) + ' · сейчас ' + tasksWord(c.n); }
     else if (k === 'planner-plans' || k === 'planner-ideas') { const a = countFiles(then), c = countFiles(now); ic = k === 'planner-plans' ? 'target' : 'bulb'; title = k === 'planner-plans' ? 'Основные планы' : 'Идеи'; sum = 'в копии файлов: ' + a.p + ', папок: ' + a.f + ' · сейчас: ' + c.p + ' и ' + c.f; }
     else if (k === 'planner-timers') { ic = 'timer'; title = 'Таймеры'; sum = 'шаблонов в копии: ' + ((then && then.presets) || []).length + ' · сейчас: ' + ((now && now.presets) || []).length; }
+    else if (k === 'planner-tools') { ic = 'film'; title = 'Моушн: мои ссылки'; sum = 'ссылок в копии: ' + ((then && then.links) || []).length + ' · сейчас: ' + ((now && now.links) || []).length; }
     else if (k.startsWith('board-')) { const t = boardTitleFrom(k.slice(6), treeDocs); ic = 'board'; title = 'Доска «' + (t || k.slice(6)) + '»'; sum = 'карточек в копии: ' + ((then && then.items) || []).length + ' · сейчас: ' + ((now && now.items) || []).length; }
     else { ic = 'file'; title = k; sum = ''; }
     const same = then != null && stable(then) === stable(now);
@@ -209,6 +210,10 @@ async function applyRestored(paths){
       lastSaved[sec] = stable(d);
       refreshSection(sec);
       if (editing && editing.k === sec) editorSync();
+    } else if (k === 'planner-tools' && typeof MT !== 'undefined') {
+      const d = await ea.dbGet(p);
+      MT.links = d && Array.isArray(d.links) ? d.links.map(normLink).filter(Boolean) : DEFAULT_LINKS;
+      if (MT.pop && MT.pop.isConnected) renderToolsTab();
     } else if (k.startsWith('board-') && boardApi && boardApi.forget) {
       const reopen = boardApi.forget(k.slice(6));
       if (reopen && findOwner(k.slice(6))) boardApi.open(k.slice(6));

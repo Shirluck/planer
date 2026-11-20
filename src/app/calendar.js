@@ -55,6 +55,7 @@ function refreshToday(){
   const od = overdueTasks();
   if (od.length) c.list.append(overdueEl(od));
   c.list.querySelectorAll('textarea').forEach(autosize);
+  paintTsel();
 }
 function overdueEl(list){
   const box = h('div', { class:'overdue' + (overdueOpen ? ' open' : '') },
@@ -160,6 +161,7 @@ function refreshWeek(){
     ? 'Срочных задач на этой неделе нет. Нажмите на день, чтобы расписать его; задача с !!! в конце — срочная и появится здесь.'
     : 'На этой неделе задач нет. Нажмите на день, чтобы расписать его.'));
   c.list.scrollTop = scroll;
+  paintTsel();
 }
 function weekDayEl(k){
   const items = dayItems(k), today = todayKey();
@@ -242,6 +244,7 @@ function renderDayView(){
   renderTaskGroups(v.list, k, items);
   v.list.querySelectorAll('textarea').forEach(autosize);
   paintDayProgress();
+  paintTsel();
 }
 function paintDayProgress(){
   const v = dayView; if (!v) return;

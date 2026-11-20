@@ -41,6 +41,17 @@ const ICONS = {
   caption: '<path d="M4 6h16M4 12h16M4 18h9"/>',
   hand: '<path d="M8 13V6a1.5 1.5 0 013 0v5M11 11V4.5a1.5 1.5 0 013 0V11M14 11V6a1.5 1.5 0 013 0v7c0 4-2.5 7-6 7s-5-2-6.5-4.5L3 12.8a1.5 1.5 0 012.5-1.6L8 14"/>',
   pen: '<path d="M4 20l1.2-4.6L15.6 5a2 2 0 012.8 0l.6.6a2 2 0 010 2.8L8.6 18.8z"/><path d="M13.5 7l3.5 3.5"/><path d="M4 20h7" opacity=".55"/>',
+  cursor: '<path d="M5 3.5l13 7.2-5.8 1.4 3.4 6.2-2.4 1.3-3.4-6.2L5.6 17z"/>',
+  alL: '<path d="M4 3v18"/><rect x="7" y="6" width="12" height="4" rx="1"/><rect x="7" y="14" width="7" height="4" rx="1"/>',
+  alC: '<path d="M12 3v18"/><rect x="5" y="6" width="14" height="4" rx="1"/><rect x="8" y="14" width="8" height="4" rx="1"/>',
+  alR: '<path d="M20 3v18"/><rect x="5" y="6" width="12" height="4" rx="1"/><rect x="10" y="14" width="7" height="4" rx="1"/>',
+  alT: '<path d="M3 4h18"/><rect x="6" y="7" width="4" height="12" rx="1"/><rect x="14" y="7" width="4" height="7" rx="1"/>',
+  alM: '<path d="M3 12h18"/><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="8" width="4" height="8" rx="1"/>',
+  alB: '<path d="M3 20h18"/><rect x="6" y="5" width="4" height="12" rx="1"/><rect x="14" y="10" width="4" height="7" rx="1"/>',
+  disH: '<path d="M4 3v18M20 3v18"/><rect x="9.5" y="7" width="5" height="10" rx="1"/>',
+  disV: '<path d="M3 4h18M3 20h18"/><rect x="7" y="9.5" width="10" height="5" rx="1"/>',
+  tidy: '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>',
+  magnet: '<path d="M6 4v7a6 6 0 0012 0V4"/><path d="M6 4h4v7a2 2 0 004 0V4h4" /><path d="M6 8h4M14 8h4" opacity=".5"/>',
   marker: '<path d="M7 14l7.5-7.5a2.1 2.1 0 013 3L10 17"/><path d="M7 14l-1.5 4.5L10 17z"/><path d="M4 21h9" stroke-width="3" opacity=".45"/>',
   eraser: '<path d="M8.5 20H20"/><path d="M5.6 15.4l8.8-8.8a2 2 0 012.8 0l2.2 2.2a2 2 0 010 2.8L12 19l-3.5 1-3-3a2 2 0 01.1-1.6z"/><path d="M9.5 11.5l5 5"/>',
   noimg: '<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M4 4l16 16"/>'
@@ -249,9 +260,14 @@ function loadInkPrefs() {
   return { tool: INK_TOOLS[p.tool] ? p.tool : 'pen', color: INK_COLORS.includes(p.color) ? p.color : 'ink', size: INK_SIZES[p.size] ? p.size : 'm' };
 }
 
+// Инструмент холста: «выделение» (протягивание по пустому месту — рамка) или «рука» (протягивание двигает холст).
+function loadNavTool() { try { return localStorage.getItem('planer-board-tool') === 'hand' ? 'hand' : 'select'; } catch (_) { return 'select'; } }
+const SNAP = 6;                  // притяжение к краям и центрам соседних карточек, px на экране
+
 function create(ctx) {
   const { h, icon, toast } = ctx;
   const inkPrefs = loadInkPrefs();
+  let navTool = loadNavTool();
   Object.assign(ctx.IC, ICONS, (window.PlanerSketch && window.PlanerSketch.ICONS) || {});
   const E = ctx.electron || null, M = E && E.media ? E.media : null;
   const SK = () => window.PlanerSketch || null;
@@ -414,7 +430,7 @@ function create(ctx) {
     document.body.append(B.ov);
     B.io = 'IntersectionObserver' in window ? new IntersectionObserver(onIntersect, { root: B.vp, rootMargin: '400px' }) : null;
     if (doc.fresh) { doc.fresh = false; if (doc.items.length) fitAll(false); else centerOrigin(); } else applyView(false);
-    renderAll(); paintEmpty(); paintUndo(); paintCtxBar();
+    renderAll(); paintEmpty(); paintUndo(); paintCtxBar(); paintNavTool();
     if (!doc.items.length || doc.fresh) { /* view already set */ }
     document.addEventListener('keydown', onKey, true);
     document.addEventListener('keyup', onKeyUp, true);
@@ -476,7 +492,12 @@ function create(ctx) {
     B.dropHint = h('div', { class: 'bd-drophint', hidden: true }, h('span', {}, icon('image', 18), 'Отпустите, чтобы добавить на доску'));
     B.progEl = h('div', { class: 'bd-progress', hidden: true, role: 'status', 'aria-live': 'polite' }, h('span', { class: 'bd-progress-t' }), h('div', { class: 'bar' }, h('i')));
     B.zoomLbl = h('button', { class: 'bd-zoom-lbl', type: 'button', title: 'Масштаб 100% (Shift+0)', 'aria-label': 'Масштаб 100%', onclick: () => zoomTo(1) }, '100%');
+    B.toolBtns = {
+      select: h('button', { type: 'button', class: 'bd-zb', 'data-tool': 'select', 'aria-label': 'Выделение (V)', title: 'Выделение (V): протяните по пустому месту — рамка выделения', onclick: () => setNavTool('select') }, icon('cursor', 16)),
+      hand: h('button', { type: 'button', class: 'bd-zb', 'data-tool': 'hand', 'aria-label': 'Рука (H)', title: 'Рука (H): протягивание двигает холст. Двигать можно и с пробелом или средней кнопкой', onclick: () => setNavTool('hand') }, icon('hand', 16))
+    };
     const zoom = h('div', { class: 'bd-zoom', role: 'group', 'aria-label': 'Масштаб' },
+      B.toolBtns.select, B.toolBtns.hand, h('span', { class: 'bd-zsep' }),
       h('button', { type: 'button', class: 'bd-zb', 'aria-label': 'Уменьшить (−)', title: 'Уменьшить (−)', onclick: () => zoomStep(1 / 1.25) }, icon('minus', 16)),
       B.zoomLbl,
       h('button', { type: 'button', class: 'bd-zb', 'aria-label': 'Увеличить (+)', title: 'Увеличить (+)', onclick: () => zoomStep(1.25) }, icon('plus', 16)),
@@ -504,7 +525,7 @@ function create(ctx) {
         h('div', { class: 'bd-top-tools' }, B.undoBtn, B.redoBtn, h('span', { class: 'bd-tsep' }), aiBtn, topTool('x', 'Закрыть доску (Esc)', () => close()))),
       h('div', { class: 'bd-main' }, rail, B.vp),
       h('footer', { class: 'bd-foot' },
-        h('span', {}, 'Двойной щелчок — заметка · ', h('kbd', {}, 'P'), ' — рисовать · ', h('kbd', {}, 'Shift'), '+перетаскивание — выделение · ', h('kbd', {}, 'Ctrl'), '+колесо — масштаб'),
+        h('span', {}, 'Двойной щелчок — заметка · рамкой по пустому месту — выделение · ', h('kbd', {}, 'Пробел'), '+мышь — двигать холст · ', h('kbd', {}, 'P'), ' — рисовать · ', h('kbd', {}, 'Ctrl'), '+колесо — масштаб'),
         h('span', {}, h('kbd', {}, 'Ctrl+Z'), ' отмена · ', h('kbd', {}, 'Ctrl+D'), ' копия · ', h('kbd', {}, 'Del'), ' удалить')));
     B.ov = h('div', { class: 'bd-ov' }, B.sheet);
     B.ov.addEventListener('mousedown', e => { if (e.target === B.ov) close(); });
@@ -926,6 +947,13 @@ function create(ctx) {
       if (it.type === 'image' || it.type === 'sketch') bar.append(btn('brush', it.type === 'image' ? 'Нарисовать поверх' : 'Редактировать зарисовку', () => it.type === 'image' ? drawOver(it) : editSketch(it)));
       if (it.type === 'image') bar.append(btn('eye', 'Открыть просмотр', () => openViewer(it)));
     }
+    if (items.length >= 2) {
+      bar.append(btn('alL', 'Выровнять по левому краю', () => alignSel('left')), btn('alC', 'По центру по горизонтали', () => alignSel('hcenter')),
+        btn('alR', 'По правому краю', () => alignSel('right')), btn('alT', 'По верхнему краю', () => alignSel('top')),
+        btn('alM', 'По центру по вертикали', () => alignSel('vcenter')), btn('alB', 'По нижнему краю', () => alignSel('bottom')));
+      if (items.length >= 3) bar.append(btn('disH', 'Распределить по горизонтали — равные промежутки', () => distributeSel('h')), btn('disV', 'Распределить по вертикали — равные промежутки', () => distributeSel('v')));
+      bar.append(btn('tidy', 'Разложить аккуратной сеткой', () => tidySel()), h('span', { class: 'bd-tsep' }));
+    }
     bar.append(btn('front', 'На передний план', () => toFront()), btn('back', 'На задний план', () => toBack()),
       btn('dup', 'Дублировать (Ctrl+D)', () => duplicate()), btn('trash', 'Удалить (Delete)', () => deleteSel()));
   }
@@ -1169,8 +1197,9 @@ function create(ctx) {
     if (!card) {
       if (e.target.closest('.bd-zoom, .bd-progress, .bd-inkbar')) return;
       if (!isTyping(e.target)) { e.preventDefault(); vp.focus({ preventScroll: true }); }
-      if (e.shiftKey || e.ctrlKey || e.metaKey) startMarquee(e, e.shiftKey);
-      else startPan(e, true);
+      const add = e.shiftKey || e.ctrlKey || e.metaKey;
+      if (navTool === 'hand' && !add) startPan(e, true);
+      else startMarquee(e, add);
       return;
     }
     const id = card.dataset.id, it = itemById(id); if (!it) return;
@@ -1182,7 +1211,7 @@ function create(ctx) {
     e.preventDefault();
     card.focus({ preventScroll: true });
     const wasSel = B.sel.has(id) && B.sel.size === 1;
-    if (e.shiftKey) { if (B.sel.has(id)) B.sel.delete(id); else B.sel.add(id); paintSel(); if (!B.sel.has(id)) return; }
+    if (e.shiftKey || e.ctrlKey || e.metaKey) { if (B.sel.has(id)) B.sel.delete(id); else B.sel.add(id); paintSel(); if (!B.sel.has(id)) return; }
     else if (!B.sel.has(id)) selectOnly(id);
     startDrag(e, card, it, wasSel);
   }
@@ -1211,24 +1240,118 @@ function create(ctx) {
       if (!moved && clickClears) { exitEdit(); clearSel(); }
     });
   }
+  function setNavTool(t) {
+    navTool = t === 'hand' ? 'hand' : 'select';
+    try { localStorage.setItem('planer-board-tool', navTool); } catch (_) {}
+    paintNavTool();
+  }
+  function paintNavTool() {
+    if (!B || !B.toolBtns) return;
+    for (const [k, b] of Object.entries(B.toolBtns)) b.setAttribute('aria-pressed', String(navTool === k));
+    B.vp.classList.toggle('bd-hand', navTool === 'hand');
+  }
+  // рамка выделения; щелчок по пустому месту без движения снимает выделение
   function startMarquee(e, additive) {
     const base = additive ? new Set(B.sel) : new Set();
     const r0 = B.vp.getBoundingClientRect(), sx = e.clientX - r0.left, sy = e.clientY - r0.top;
     const mq = B.marquee;
+    let moved = false;
     exitEdit();
     capture(e, ev => {
       const x = ev.clientX - r0.left, y = ev.clientY - r0.top;
+      if (!moved && Math.hypot(x - sx, y - sy) < 3) return;
+      moved = true;
       const L = Math.min(sx, x), T = Math.min(sy, y), W = Math.abs(x - sx), H = Math.abs(y - sy);
       mq.hidden = false; mq.style.transform = 'translate(' + L + 'px,' + T + 'px)'; mq.style.width = W + 'px'; mq.style.height = H + 'px';
       const v = B.doc.view, wx = (L - v.x) / v.zoom, wy = (T - v.y) / v.zoom, ww = W / v.zoom, wh = H / v.zoom;
       const sel = new Set(base);
       for (const it of B.doc.items) { const r = rectOf(it); if (r.x < wx + ww && r.x + r.w > wx && r.y < wy + wh && r.y + r.h > wy) sel.add(it.id); }
       B.sel = sel; paintSel();
-    }, () => { if (B) mq.hidden = true; });
+    }, () => { if (!B) return; mq.hidden = true; if (!moved && !additive) clearSel(); });
   }
+  /* ---------- выравнивание: края, центры, равные промежутки, сетка; притяжение с направляющими ---------- */
+  function alignSel(kind) {
+    const items = selItems(); if (items.length < 2) return;
+    const rs = new Map(items.map(it => [it.id, rectOf(it)])), bb = bbox(items);
+    change(() => {
+      for (const it of items) {
+        const r = rs.get(it.id);
+        if (kind === 'left') it.x = Math.round(bb.x);
+        else if (kind === 'right') it.x = Math.round(bb.x + bb.w - r.w);
+        else if (kind === 'hcenter') it.x = Math.round(bb.x + bb.w / 2 - r.w / 2);
+        else if (kind === 'top') it.y = Math.round(bb.y);
+        else if (kind === 'bottom') it.y = Math.round(bb.y + bb.h - r.h);
+        else if (kind === 'vcenter') it.y = Math.round(bb.y + bb.h / 2 - r.h / 2);
+      }
+    });
+  }
+  function distributeSel(axis) {
+    const items = selItems(); if (items.length < 3) return;
+    const X = axis === 'h', rs = items.map(it => ({ it, r: rectOf(it) })).sort((a, b) => X ? a.r.x - b.r.x : a.r.y - b.r.y);
+    const first = rs[0].r, last = rs[rs.length - 1].r;
+    const span = X ? last.x + last.w - first.x : last.y + last.h - first.y;
+    const gap = (span - rs.reduce((s, q) => s + (X ? q.r.w : q.r.h), 0)) / (rs.length - 1);
+    change(() => { let pos = X ? first.x : first.y; for (const q of rs) { if (X) q.it.x = Math.round(pos); else q.it.y = Math.round(pos); pos += (X ? q.r.w : q.r.h) + gap; } });
+  }
+  // аккуратная сетка: строки по порядку на доске, ровные промежутки
+  function tidyItems(items, origin, cols) {
+    const rs = items.map(it => ({ it, r: rectOf(it) })).sort((a, b) => (Math.round(a.r.y / 120) - Math.round(b.r.y / 120)) || (a.r.x - b.r.x));
+    const bb = bbox(items), o = origin || { x: bb.x, y: bb.y };
+    const n = cols || Math.max(1, Math.round(Math.sqrt(rs.length * 1.6)));
+    let y = o.y;
+    for (let i = 0; i < rs.length; i += n) {
+      const row = rs.slice(i, i + n);
+      let x = o.x;
+      for (const q of row) { q.it.x = Math.round(x); q.it.y = Math.round(y); x += q.r.w + GAP; }
+      y += Math.max(...row.map(q => q.r.h)) + GAP;
+    }
+  }
+  function tidySel() { const items = selItems(); if (items.length < 2) return; change(() => tidyItems(items)); }
+  // притяжение группы к краям и центрам остальных карточек; Alt — без притяжения
+  function snapMove(g0, dx, dy, others, off) {
+    const lines = [];
+    if (off || !others.length) return { dx, dy, lines };
+    const th = SNAP / B.doc.view.zoom;
+    const g = { x: g0.x + dx, y: g0.y + dy, w: g0.w, h: g0.h };
+    const best = (gs, key) => {
+      let b = null;
+      for (const o of others) {
+        const os = key === 'x' ? [o.x, o.x + o.w / 2, o.x + o.w] : [o.y, o.y + o.h / 2, o.y + o.h];
+        for (const ov of os) for (const gv of gs) { const d = ov - gv; if (Math.abs(d) <= th && (!b || Math.abs(d) < Math.abs(b.d))) b = { d, v: ov }; }
+      }
+      return b;
+    };
+    const bx = best([g.x, g.x + g.w / 2, g.x + g.w], 'x'), by = best([g.y, g.y + g.h / 2, g.y + g.h], 'y');
+    if (bx) { dx += bx.d; g.x += bx.d; }
+    if (by) { dy += by.d; g.y += by.d; }
+    const near = (a, b) => Math.abs(a - b) < 0.5;
+    if (bx) {
+      const hit = others.filter(o => [o.x, o.x + o.w / 2, o.x + o.w].some(v => near(v, bx.v)));
+      const y1 = Math.min(g.y, ...hit.map(o => o.y)), y2 = Math.max(g.y + g.h, ...hit.map(o => o.y + o.h));
+      lines.push({ v: true, x: bx.v, y: y1, len: y2 - y1 });
+    }
+    if (by) {
+      const hit = others.filter(o => [o.y, o.y + o.h / 2, o.y + o.h].some(v => near(v, by.v)));
+      const x1 = Math.min(g.x, ...hit.map(o => o.x)), x2 = Math.max(g.x + g.w, ...hit.map(o => o.x + o.w));
+      lines.push({ v: false, x: x1, y: by.v, len: x2 - x1 });
+    }
+    return { dx, dy, lines };
+  }
+  function paintGuides(lines) {
+    if (!B.guides) { B.guides = h('div', { class: 'bd-guides', 'aria-hidden': 'true' }); B.world.append(B.guides); }
+    B.guides.replaceChildren(...lines.map(l => {
+      const el = h('div', { class: 'bd-guide ' + (l.v ? 'v' : 'h') });
+      el.style.transform = 'translate(' + l.x + 'px,' + l.y + 'px)';
+      if (l.v) el.style.height = l.len + 'px'; else el.style.width = l.len + 'px';
+      return el;
+    }));
+  }
+
   function startDrag(e, card, it, wasSel) {
     const sx = e.clientX, sy = e.clientY, z = B.doc.view.zoom;
     const moving = selItems().map(x => ({ it: x, x: x.x, y: x.y }));
+    const others = B.doc.items.filter(x => !B.sel.has(x.id)).map(rectOf);
+    const g0 = bbox(moving.map(m => m.it));
     const before = snap();
     const target = e.target;
     let moved = false, raf = 0;
@@ -1240,12 +1363,15 @@ function create(ctx) {
         const top = maxZ(), sorted = moving.slice().sort((a, b) => a.it.z - b.it.z);
         if (sorted.some(m => m.it.z < top) || sorted.length > 1) { let z = top; sorted.forEach(m => { m.it.z = ++z; }); }
       }
-      const dx = (ev.clientX - sx) / z, dy = (ev.clientY - sy) / z;
+      const sn = snapMove(g0, (ev.clientX - sx) / z, (ev.clientY - sy) / z, others, ev.altKey);
+      const dx = sn.dx, dy = sn.dy;
+      paintGuides(sn.lines);
       moving.forEach(m => { m.it.x = Math.round(m.x + dx); m.it.y = Math.round(m.y + dy); });
       if (!raf) raf = requestAnimationFrame(() => { raf = 0; if (B) moving.forEach(m => { const el = B.els.get(m.it.id); if (el) place(el, m.it); }); });
     }, (ev, cancelled) => {
       if (!B) return;
       cancelAnimationFrame(raf);
+      paintGuides([]);
       B.vp.classList.remove('bd-dragging');
       moving.forEach(m => { const el = B.els.get(m.it.id); if (el) place(el, m.it); });
       if (moved) { pushHistory(before); scheduleSave(B.taskId); return; }
@@ -1564,6 +1690,7 @@ function create(ctx) {
     if (typing) return;
     const stop = () => { e.preventDefault(); e.stopPropagation(); };
     if (!mod && !e.altKey && e.code === 'KeyP') { stop(); toggleDraw(); return; }
+    if (!mod && !e.altKey && !B.draw && (e.code === 'KeyV' || e.code === 'KeyH')) { stop(); setNavTool(e.code === 'KeyH' ? 'hand' : 'select'); return; }
     if (B.draw && !mod && !e.altKey && (e.code === 'KeyE' || e.code === 'KeyM' || e.code === 'KeyB')) {   // E — ластик, M — маркер, B — перо
       stop(); setInk({ tool: e.code === 'KeyE' ? 'eraser' : e.code === 'KeyM' ? 'marker' : 'pen' }); return;
     }
@@ -1839,7 +1966,8 @@ function create(ctx) {
   async function readBoard(taskId) {
     const doc = await loadDoc(taskId);
     return doc.items.slice().sort((a, b) => (a.y - b.y) || (a.x - b.x)).map(it => {
-      const o = { id: it.id, type: it.type, x: it.x, y: it.y, w: it.w, h: it.h };
+      const r = rectOf(it);                 // на открытой доске — настоящая высота, иначе оценка
+      const o = { id: it.id, type: it.type, x: it.x, y: it.y, w: it.w, h: Math.round(r.h) };
       if (it.type === 'note') { o.text = it.text; if (it.color) o.color = it.color; }
       else if (it.type === 'checklist') { o.title = it.title; o.items = it.items.map(x => ({ text: x.text, done: x.done })); }
       else if (it.type === 'link') { o.url = it.url; if (it.title || it.ptitle) o.title = it.title || it.ptitle; if (it.desc) o.description = it.desc; if (it.site) o.site = it.site; }
@@ -1877,6 +2005,116 @@ function create(ctx) {
     else { it.z = doc.items.reduce((m, q) => Math.max(m, q.z), 0) + 1; doc.items.push(it); scheduleSave(taskId, 0); }
     return it;
   }
+  // Изменение доски ассистентом: на открытой доске — обычный шаг истории (Ctrl+Z), на закрытой — тоже в её историю.
+  // Возвращает функцию «вернуть как было».
+  // fn(items) меняет карточки и возвращает { result, revert(items) } — revert точечно отменяет только своё
+  // (позиции переставленных, поля изменённой, удалённые карточки), не трогая то, что сделано позже.
+  async function editBoard(taskId, fn) {
+    const doc = await loadDoc(taskId);
+    const live = B && B.taskId === taskId;
+    const before = JSON.stringify(doc.items);
+    let out = {};
+    if (live) { exitEdit(); change(() => { out = fn(B.doc.items) || {}; }); }
+    else {
+      out = fn(doc.items) || {};
+      if (JSON.stringify(doc.items) !== before) { const H = hist(taskId); H.undo.push(before); if (H.undo.length > HISTORY) H.undo.shift(); H.redo.length = 0; scheduleSave(taskId, 0); }
+    }
+    const changed = JSON.stringify(doc.items) !== before;
+    const undo = changed && out.revert ? () => editBoard(taskId, items => { out.revert(items); return {}; }) : null;
+    return { result: out.result, undo, changed };
+  }
+  const geomOf = it => ({ x: it.x, y: it.y, w: it.w, h: it.h });
+  const revertGeom = prev => items => { for (const it of items) if (prev.has(it.id)) Object.assign(it, prev.get(it.id)); };
+  const clampPos = v => Math.round(clampN(num(v, 0), -100000, 100000));
+  // переставить и (по желанию) изменить размер карточек; картинки и рисунки — без искажения пропорций
+  function moveCards(taskId, moves) {
+    return editBoard(taskId, items => {
+      const missing = [], prev = new Map();
+      let moved = 0;
+      for (const m of (Array.isArray(moves) ? moves : []).slice(0, 500)) {
+        const it = items.find(x => x.id === String(m && m.id)); if (!it) { missing.push(String(m && m.id)); continue; }
+        if (!prev.has(it.id)) prev.set(it.id, geomOf(it));
+        if (m.x != null) it.x = clampPos(m.x);
+        if (m.y != null) it.y = clampPos(m.y);
+        const keep = isMediaType(it.type) || it.type === 'ink';
+        if (m.w != null) { const w0 = it.w; it.w = Math.round(clampN(num(m.w, it.w), it.type === 'ink' ? 12 : 60, 4000)); if (keep && m.h == null) it.h = Math.max(4, Math.round(it.h * it.w / w0)); }
+        if (m.h != null && !keep && it.type !== 'link') it.h = Math.round(clampN(num(m.h, it.h), 24, 4000));
+        moved++;
+      }
+      return { result: { moved, missing }, revert: revertGeom(prev) };
+    });
+  }
+  // автоматическая раскладка: сетка или колонки по типу карточек (заметки, чек-листы, ссылки, медиа, рисунки)
+  function arrangeCards(taskId, layout, ids) {
+    return editBoard(taskId, items => {
+      const want = Array.isArray(ids) && ids.length ? new Set(ids.map(String)) : null;
+      const list = items.filter(it => !want || want.has(it.id));
+      if (list.length < 1) return { result: { arranged: 0 } };
+      const prev = new Map(list.map(it => [it.id, geomOf(it)]));
+      const bb = bbox(list), origin = { x: bb.x, y: bb.y };
+      if (layout === 'columns') {
+        const order = ['note', 'checklist', 'link', 'image', 'video', 'sketch', 'ink'];
+        let x = origin.x;
+        for (const t of order) {
+          const col = list.filter(it => it.type === t).sort((a, b) => (a.y - b.y) || (a.x - b.x));
+          if (!col.length) continue;
+          let y = origin.y, wmax = 0;
+          for (const it of col) { const r = rectOf(it); it.x = Math.round(x); it.y = Math.round(y); y += r.h + GAP; wmax = Math.max(wmax, r.w); }
+          x += wmax + GAP * 2;
+        }
+      } else if (layout === 'row') tidyItems(list, origin, list.length);
+      else tidyItems(list, origin);
+      return { result: { arranged: list.length }, revert: revertGeom(prev) };
+    });
+  }
+  // правка содержимого карточки (текст заметки, чек-лист, цвет, заголовок ссылки, подпись к медиа)
+  function updateCard(taskId, cardId, p) {
+    return editBoard(taskId, items => {
+      const it = items.find(x => x.id === String(cardId)); if (!it) throw new Error('Card not found: ' + cardId);
+      p = p || {};
+      const keys = ['text', 'title', 'items', 'color', 'url', 'caption', 'pv', 'pvUrl', 'pvAt'];
+      const old = JSON.parse(JSON.stringify(Object.fromEntries(keys.filter(k => k in it).map(k => [k, it[k]]))));
+      if (p.color !== undefined && (it.type === 'note' || it.type === 'checklist')) { if (!COLORS.includes(p.color)) throw new Error('color must be one of: ' + COLORS.filter(Boolean).join(', ') + ' or empty'); it.color = p.color; }
+      if (it.type === 'note' && typeof p.text === 'string') it.text = str(p.text, 20000);
+      if (it.type === 'checklist') {
+        if (typeof p.title === 'string') it.title = str(p.title, 300);
+        if (Array.isArray(p.items)) it.items = p.items.slice(0, 500).map((x, i) => ({ id: (it.items[i] && it.items[i].id) || rid(), text: str(x && x.text, 2000), done: !!(x && x.done) }));
+      }
+      if (it.type === 'link') {
+        if (typeof p.title === 'string') it.title = str(p.title, 300);
+        if (typeof p.url === 'string') { const u = safeUrl(p.url); if (!u) throw new Error('url must be http(s)'); if (u !== it.url) { it.url = u; delete it.pv; } }
+      }
+      if (isMediaType(it.type) && typeof p.caption === 'string') it.caption = str(p.caption, 2000);
+      const id = it.id;
+      return { result: { ok: true, type: it.type }, revert: list => {
+        const x = list.find(q => q.id === id); if (!x) return;
+        for (const k of keys) { if (k in old) x[k] = JSON.parse(JSON.stringify(old[k])); else delete x[k]; }
+      } };
+    });
+  }
+  function removeCards(taskId, ids) {
+    return editBoard(taskId, items => {
+      const want = new Set((Array.isArray(ids) ? ids : []).map(String));
+      const gone = [];
+      for (let i = items.length - 1; i >= 0; i--) if (want.has(items[i].id)) gone.unshift({ it: items.splice(i, 1)[0], i });
+      if (B && B.taskId === taskId) for (const id of want) B.sel.delete(id);
+      return { result: { removed: gone.length }, revert: list => {
+        for (const g of gone) if (!list.some(q => q.id === g.it.id)) list.splice(Math.min(g.i, list.length), 0, JSON.parse(JSON.stringify(g.it)));
+      } };
+    });
+  }
+  // ссылка на доску от ассистента (превью подгрузится при открытии доски)
+  async function addLink(taskId, url, title, x, y) {
+    const u = safeUrl(url); if (!u) throw new Error('url must be http(s)');
+    const doc = await loadDoc(taskId), live = B && B.taskId === taskId;
+    const it = { id: rid(), type: 'link', x: 0, y: 0, w: 280, h: 80, z: 0, url: u, title: str(title, 300) };
+    if (typeof x === 'number' && typeof y === 'number' && isFinite(x) && isFinite(y)) { it.x = Math.round(x); it.y = Math.round(y); }
+    else { const c = live ? viewCenter() : (() => { const bb = bbox(doc.items); return bb ? { x: bb.x + bb.w / 2, y: bb.y + bb.h / 2 } : { x: 0, y: 0 }; })(); const p = findFree(doc, it.w, linkHeight(it), c.x, c.y); it.x = p.x; it.y = p.y; }
+    if (live) addItems([it], { reveal: true });
+    else { it.z = doc.items.reduce((m, q) => Math.max(m, q.z), 0) + 1; doc.items.push(it); scheduleSave(taskId, 0); }
+    return it;
+  }
+
   async function findCard(cardId) {
     if (B) { const it = itemById(cardId); if (it) return { taskId: B.taskId, item: it }; }
     for (const [taskId, d] of docs) { const it = d.items.find(x => x.id === cardId); if (it) return { taskId, item: it }; }
@@ -1912,6 +2150,6 @@ function create(ctx) {
     return wasOpen;
   }
 
-  return { open, close, isOpen, openTaskId, flush, readBoard, addCard, findCard, imageForAI, onTaskText, onTaskGone, thumbUrl, mediaUrl, reveal, forget };
+  return { open, close, isOpen, openTaskId, flush, readBoard, addCard, addLink, moveCards, arrangeCards, updateCard, removeCards, findCard, imageForAI, onTaskText, onTaskGone, thumbUrl, mediaUrl, reveal, forget };
 }
 })();

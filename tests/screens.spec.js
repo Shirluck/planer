@@ -259,4 +259,48 @@ test.describe.serial('Скриншоты', () => {
     await scheme('dark'); await shot('board-drawing-dark'); await scheme('light');
     await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
   });
+
+  test('заметки как в Notion, моушн-инструменты, выделение задач и выравнивание на доске', async () => {
+    await setSize(app, 1280, 800);
+    // заметка
+    const nid = await addPage(page, 'ideas', 'Сценарий ролика', 'text');
+    await page.locator('.node[data-id="' + nid + '"] .n-title').dblclick();
+    await page.locator('.ne .nb').first().click();
+    await page.evaluate(() => {
+      const dt = new DataTransfer();
+      dt.setData('text/plain', '# Сценарий\nКороткий ролик на **30 секунд** о новой коллекции.\n## Сцены\n1. Логотип собирается из частиц\n2. Товар крупным планом\n  - медленный наезд камеры\n3. Финальный кадр с призывом\n- [x] раскадровка\n- [ ] анимация\n> Простота — высшая сложность\n---');
+      boxEl.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+    });
+    await page.keyboard.type('/выно'); await page.keyboard.press('Enter'); await page.keyboard.type('Сдать черновик в пятницу');
+    await page.locator('.ne .nb').nth(1).hover();
+    await shot('notes-light');
+    await scheme('dark'); await shot('notes-dark'); await scheme('light');
+    await page.keyboard.type('/');
+    await shot('notes-slash-light');
+    await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
+    // моушн-инструменты
+    await page.click('#toolsBtn');
+    await page.click('.mt-tab[data-tab=links]');
+    await shot('motion-links-light');
+    await page.click('.mt-tab[data-tab=expr]'); await page.click('.mt-li:has-text("Инерция")');
+    await shot('motion-expr-light');
+    await scheme('dark'); await shot('motion-expr-dark'); await scheme('light');
+    await page.click('.mt-tab[data-tab=time]');
+    await shot('motion-time-light');
+    await page.keyboard.press('Escape');
+    // выделение задач скопом
+    const rows = page.locator('.col[data-key=day] .item');
+    await rows.nth(0).locator('.txt').click({ modifiers: ['Control'] });
+    await rows.nth(1).locator('.txt').click({ modifiers: ['Control'] });
+    await shot('tasks-select-light');
+    await page.keyboard.press('Escape');
+    // выравнивание на доске
+    const bid = await addPage(page, 'ideas', 'Референсы');
+    await openBoard(page, bid);
+    await page.evaluate(k => Promise.all([['**Свет**\nмягкий, контровой', 0, 30], ['**Цвет**\nтёплая палитра', 300, 0], ['**Шрифт**\nгротеск', 620, 70]].map(([t, x, y]) => boardApi.addCard(k, 'note', t, x, y))), bid);
+    await page.click('.bd-zoom .bd-zb[aria-label^="Показать всё"]');
+    await page.keyboard.press('Control+a');
+    await shot('board-align-light');
+    await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
+  });
 });

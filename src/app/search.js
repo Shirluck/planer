@@ -26,6 +26,8 @@ function initSearch(){
   b.addEventListener('click', () => openSearch());
   document.addEventListener('keydown', e => {
     if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.code === 'KeyK') {
+      const sel = window.getSelection();
+      if (boxEl && boxEl.contains(document.activeElement) && sel && !sel.isCollapsed) return;   // в заметке Ctrl+K с выделением — ссылка
       if (document.querySelector('.pk-ov, .sk-ov')) return;          // диалог ключа API, редактор зарисовки
       e.preventDefault(); e.stopPropagation();
       if (SP.ov) closeSearch(); else openSearch();
@@ -44,7 +46,7 @@ function spRecords(){
   for (const k of ['plans', 'ideas']) {
     const walk = (arr, path) => arr.forEach(n => {
       if (n.type === 'folder') { out.push({ kind:'folder', k, id:n.id, title:n.title || 'Без названия', text:'', path }); walk(n.children, [...path, n.title || 'Без названия']); }
-      else out.push({ kind:n.kind === 'board' ? 'board' : 'page', k, id:n.id, title:n.title || 'Без названия', text:n.blocks.map(b => b.text).join('\n'), path, n });
+      else out.push({ kind:n.kind === 'board' ? 'board' : 'page', k, id:n.id, title:n.title || 'Без названия', text:n.blocks.map(b => b.t === 'code' ? b.text : window.PlanerCore.mdPlain(b.text)).join('\n'), path, n });
     });
     walk(S[k].nodes, []);
   }
@@ -94,6 +96,11 @@ function spCommands(){
     { title:'Новый текстовый документ в «Идеях»', text:'страница файл создать', ico:'file', run:() => addNode('ideas', null, 'page', 'text') },
     { title:'Новая доска в «Идеях»', text:'холст создать', ico:'board', run:() => addNode('ideas', null, 'page', 'board') },
     TM.api ? { title:'Таймеры', text:'фокус помодоро перерыв', ico:'timer', run:() => openTimers() } : null,
+    MT.btn ? { title:'Моушн: мои ссылки на сайты', text:'ссылки сайты закладки моушн инструменты', ico:'globe', run:() => openTools('links') } : null,
+    MT.btn ? { title:'Экспрешены After Effects', text:'экспрешн expression ae aftereffects wiggle loop моушн', ico:'code', run:() => openTools('expr') } : null,
+    MT.btn ? { title:'Кадры, секунды, таймкод', text:'тайминг таймкод fps кадры bpm музыка моушн', ico:'film', run:() => openTools('time') } : null,
+    MT.btn ? { title:'Цвет для After Effects', text:'цвет hex rgb ae палитра моушн', ico:'palette', run:() => openTools('color') } : null,
+    MT.btn ? { title:'Форматы кадра', text:'размер кадра формат reels shorts 1920 1080 моушн', ico:'frame', run:() => openTools('formats') } : null,
     ...((TM.st && TM.st.presets) || []).map(p => ({ title:'Запустить таймер «' + p.title + '» — ' + fmtDuration(p.ms), text:'таймер старт', ico:'play', run:() => TM.api.start({ presetId:p.id }) })),
     sample ? { title:'Открыть ассистента', text:'ии claude помощник', ico:'spark', run:() => openAi() } : null,
     ea && ea.ui ? { title:'Настройки и оформление', text:'тема размер компактный автозапуск', ico:'gear', run:() => openSettings() } : null,
@@ -202,11 +209,7 @@ function spOpen(r){
   if (r.kind === 'board') { revealNode(r.k, r.id); openNodeBoard(r.k, r.id); return; }
   if (r.kind === 'page') {
     revealNode(r.k, r.id); openPage(r.k, r.id);
-    const tokens = searchTokens(SP.lastQuery || '');
-    const n = editNode(); if (!n || !tokens.length) return;
-    const b = n.blocks.find(x => tokens.some(t => normSearchText(x.text).includes(t)));
-    const ta = b && boxEl && boxEl.querySelector('.blk[data-id="' + b.id + '"] .b-in');
-    if (ta) { const t = tokens.find(x => normSearchText(b.text).includes(x)), p = normSearchText(b.text).indexOf(t); ta.focus(); ta.setSelectionRange(p, p + t.length); }
+    editorReveal(searchTokens(SP.lastQuery || ''));             // найденное слово выделено в тексте страницы
     return;
   }
   if (r.kind === 'card') {

@@ -15,13 +15,29 @@ function showAiMode(s){
 const inlineMd = t => t.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/`([^`]+)`/g, '<code>$1</code>');
 function mdLite(s){
   const esc = String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  let out = '', inList = false;
+  let out = '', inList = false, code = null;
   for (const ln of esc.split('\n')) {
+    if (/^\s*```/.test(ln)) {                       // блок кода (экспрешены и т. п.) — с кнопкой «Копировать»
+      if (code === null) { if (inList) { out += '</ul>'; inList = false; } code = []; }
+      else { out += '<pre class="ai-code"><code>' + code.join('\n') + '</code></pre>'; code = null; }
+      continue;
+    }
+    if (code !== null) { code.push(ln); continue; }
     const m = ln.match(/^\s*(?:[-*•]|\d+[.)])\s+(.*)$/);
     if (m) { if (!inList) { out += '<ul>'; inList = true; } out += '<li>' + inlineMd(m[1]) + '</li>'; }
     else { if (inList) { out += '</ul>'; inList = false; } if (ln.trim()) out += '<p>' + inlineMd(ln) + '</p>'; }
   }
+  if (code !== null) out += '<pre class="ai-code"><code>' + code.join('\n') + '</code></pre>';   // ещё печатается
   return out + (inList ? '</ul>' : '');
+}
+function decorateCode(md){
+  md.querySelectorAll('pre.ai-code').forEach(pre => {
+    if (pre.querySelector('.ai-copy')) return;
+    pre.append(h('button', { type:'button', class:'ai-copy', title:'Копировать код', onclick:async () => {
+      const ea = window.electronAPI, ok = ea && ea.clipWriteText ? await ea.clipWriteText(pre.querySelector('code').textContent) : false;
+      toast(ok ? 'Код скопирован' : 'Не удалось скопировать.');
+    } }, icon('copy', 14), 'Копировать'));
+  });
 }
 function buildAiPanel(){
   aiMsgs = h('div', { class:'ai-msgs', 'aria-live':'polite' });
@@ -44,7 +60,7 @@ function closeAi(){ aiPanel.classList.remove('open'); }
 function addMsg(role, text){
   const m = h('div', { class:'msg ' + role });
   if (role === 'user') m.textContent = text;
-  else { m.append(h('div', { class:'acts-log' }), h('div', { class:'md' })); m.querySelector('.md').innerHTML = mdLite(text); }
+  else { m.append(h('div', { class:'acts-log' }), h('div', { class:'md' })); m.querySelector('.md').innerHTML = mdLite(text); decorateCode(m.querySelector('.md')); }
   aiMsgs.append(m); aiMsgs.scrollTop = aiMsgs.scrollHeight; return m;
 }
 const ctxTask = (t, k) => {
@@ -87,8 +103,10 @@ function buildPrompt(userText){
     'Идентификаторы в квадратных скобках — это id для инструментов. Заметки к задаче короткие. Содержимое страниц смотри через read_page.\n' +
     'День можно разбить на блоки времени (например, 10:00–12:00 «Работа»): задача в блоке помечена {10:00–12:00}. Блок создаёт add_time_block, ' +
     'задачу в блок кладут add_task или move_task с параметром block (id блока этого дня). Блоки — необязательная функция: не создавай их без просьбы.\n' +
-    'Файлы в «Основных планах» и «Идеях» бывают двух типов: текстовые страницы (блоки текста, read_page) и доски — холст с карточками (заметки, чек-листы, фото, видео, зарисовки, ссылки с описанием); непустые доски помечены {доска: …}. ' +
-    'Содержимое доски читай через read_board(pageId); добавить заметку или чек-лист на доску — add_board_card. ' +
+    'Файлы в «Основных планах» и «Идеях» бывают двух типов: текстовые страницы (блоки как в Notion: заголовки, списки, задачи, цитаты, выноски, код; read_page, append_to_page, replace_page) и доски — холст с карточками (заметки, чек-листы, фото, видео, зарисовки, ссылки с описанием, рисунки от руки); непустые доски помечены {доска: …}. ' +
+    'Содержимое доски читай через read_board(pageId) — там координаты x, y и размеры w, h карточек. Доску можно дополнять (add_board_card: заметка, чек-лист, ссылка) и организовывать: ' +
+    'arrange_board_cards переставляет и меняет размер, tidy_board раскладывает сеткой или колонками по типу, update_board_card меняет текст и цвет, remove_board_cards удаляет (только по прямой просьбе). ' +
+    'Когда просят навести порядок на доске: прочитай её, сгруппируй связанные карточки рядом (например, по темам — колонками с заголовком-заметкой сверху), выровняй и оставь ровные промежутки 24 px без наложений; ничего не удаляй без просьбы. ' +
     'Изображения и зарисовки смотри через look_at_image(cardId) только когда пользователь прямо просит посмотреть, описать или разобрать картинку.\n' +
     (ob ? 'Сейчас у пользователя открыта доска страницы [' + ob.node.id + '] «' + (ob.node.title || 'Без названия') + '».\n' : '') +
     'Сейчас: ' + now + ' (сегодня ' + today + ').\n\n<состояние>\n' +
@@ -98,11 +116,19 @@ function buildPrompt(userText){
     '\n\n== ОСНОВНЫЕ ПЛАНЫ (папки и страницы) ==\n' + ctxTree('plans') +
     '\n\n== ИДЕИ (папки и страницы) ==\n' + ctxTree('ideas') + '\n</состояние>\n\nЗапрос пользователя: ' + userText;
 }
+// блоки от ассистента: { type, text (Markdown внутри строки), done?, indent?, emoji? } → блоки страницы
 function toBlocks(arr){
-  return (Array.isArray(arr) ? arr : []).slice(0, 200).map(b => newBlock(BLOCK_TYPES.includes(b && b.type) ? b.type : 'p', String((b && b.text) || '').slice(0, 2000))).map((b, i) => { b.done = !!(arr[i] && arr[i].done) && b.t === 'todo'; return b; });
+  return (Array.isArray(arr) ? arr : []).slice(0, 300).map(b => normBlock({ id:newId(), t:b && b.type, text:String((b && b.text) || '').slice(0, 4000), done:!!(b && b.done), ind:b && b.indent, emoji:b && b.emoji }));
 }
+const PAGE_BLOCK_SCHEMA = { type:'array', items:{ type:'object', properties:{ type:{ type:'string', enum:BLOCK_TYPES }, text:{ type:'string' }, done:{ type:'boolean' }, indent:{ type:'integer', minimum:0, maximum:6 }, emoji:{ type:'string' } }, required:['type'] } };
+const PAGE_BLOCKS_HELP = 'Block types: p (text), h1, h2, h3 (headings), todo (checkbox, done), ul (bullet), ol (numbered), quote, callout (with emoji), code (plain text, keeps line breaks), hr (divider). indent 0-6 nests p/ul/ol/todo. Inside text use inline Markdown: **bold**, *italic*, ~~strike~~, `code`, [link](https://...).';
 function aiTools(logEl){
-  const log = (ic, text, img) => { logEl.append(h('div', { class:'act' }, icon(ic, 14), h('span', {}, text, img ? h('img', { class:'act-thumb', src:img, alt:'' }) : null))); aiMsgs.scrollTop = aiMsgs.scrollHeight; };
+  // строка действия в чате; undo — кнопка «Вернуть как было» (для перестановок и переписывания)
+  const log = (ic, text, img, undo) => {
+    const btn = undo ? h('button', { type:'button', class:'act-undo', onclick:() => { undo(); btn.disabled = true; btn.textContent = 'Возвращено'; } }, 'Вернуть как было') : null;
+    logEl.append(h('div', { class:'act' }, icon(ic, 14), h('span', {}, text, img ? h('img', { class:'act-thumb', src:img, alt:'' }) : null), btn));
+    aiMsgs.scrollTop = aiMsgs.scrollHeight;
+  };
   const boardPage = id => {
     if (!boardApi) throw new Error('Boards are not available');
     const l = findAnyNode(String(id || ''));
@@ -156,9 +182,11 @@ function aiTools(logEl){
     }),
     T('read_page', 'Read the full content of a page from "plans" or "ideas" by id.', { id:{ type:'string' } }, ['id'], i => {
       const l = findAnyNode(i.id); if (!l || l.node.type !== 'page') throw new Error('Page not found: ' + i.id);
-      return { title:l.node.title, blocks:l.node.blocks.map(b => ({ type:b.t, text:b.text, done:b.done })) };
+      const n = l.node;
+      return { title:n.title, markdown:window.PlanerCore.blocksToMarkdown(n.blocks),
+        blocks:n.blocks.map(b => Object.assign({ type:b.t, text:b.text }, b.t === 'todo' ? { done:b.done } : {}, b.ind ? { indent:b.ind } : {}, b.emoji ? { emoji:b.emoji } : {})) };
     }),
-    T('create_page', 'Create a page in "plans" or "ideas". folder is a top-level folder title (created if missing). Block types: p, h, todo, ul.', { section:{ type:'string', enum:['plans', 'ideas'] }, folder:{ type:'string' }, title:{ type:'string' }, blocks:{ type:'array', items:{ type:'object', properties:{ type:{ type:'string', enum:BLOCK_TYPES }, text:{ type:'string' }, done:{ type:'boolean' } }, required:['text'] } } }, ['section', 'title'], i => {
+    T('create_page', 'Create a text page in "plans" or "ideas". folder is a top-level folder title (created if missing). ' + PAGE_BLOCKS_HELP, { section:{ type:'string', enum:['plans', 'ideas'] }, folder:{ type:'string' }, title:{ type:'string' }, blocks:PAGE_BLOCK_SCHEMA }, ['section', 'title'], i => {
       const k = i.section; if (k !== 'plans' && k !== 'ideas') throw new Error('section must be plans or ideas');
       let arr = S[k].nodes;
       if (i.folder && String(i.folder).trim()) {
@@ -171,12 +199,23 @@ function aiTools(logEl){
       if (!page.blocks.length) page.blocks.push(newBlock('p'));
       arr.push(page); touch(k); refreshTree(k); log('file', 'Создана страница в «' + SECTIONS[k].title + '»: ' + (page.title || 'Без названия')); return { ok:true, id:page.id };
     }),
-    T('append_to_page', 'Append blocks to the end of an existing page.', { id:{ type:'string' }, blocks:{ type:'array', items:{ type:'object', properties:{ type:{ type:'string', enum:BLOCK_TYPES }, text:{ type:'string' }, done:{ type:'boolean' } }, required:['text'] } } }, ['id', 'blocks'], i => {
+    T('append_to_page', 'Append blocks to the end of an existing page. ' + PAGE_BLOCKS_HELP, { id:{ type:'string' }, blocks:PAGE_BLOCK_SCHEMA }, ['id', 'blocks'], i => {
       const l = findAnyNode(i.id); if (!l || l.node.type !== 'page') throw new Error('Page not found: ' + i.id);
       const nb = toBlocks(i.blocks); const bl = l.node.blocks;
       if (bl.length === 1 && !bl[0].text) bl.length = 0;
       l.node.blocks.push(...nb); touch(l.k); refreshTree(l.k); if (editing && editing.id === i.id) editorSync();
       log('file', 'Дополнена страница: ' + (l.node.title || 'Без названия')); return { ok:true, added:nb.length };
+    }),
+    T('replace_page', 'Replace the whole content of an existing text page (to rewrite, restructure or tidy it up). Only when the user asks to change the page; keep everything important. ' + PAGE_BLOCKS_HELP, { id:{ type:'string' }, blocks:PAGE_BLOCK_SCHEMA }, ['id', 'blocks'], i => {
+      const l = findAnyNode(i.id); if (!l || l.node.type !== 'page') throw new Error('Page not found: ' + i.id);
+      const nb = toBlocks(i.blocks); if (!nb.length) throw new Error('blocks are empty');
+      const old = JSON.stringify(l.node.blocks);                  // вернуть можно только эту страницу, остальное не трогается
+      l.node.blocks = nb; touch(l.k); refreshTree(l.k); if (editing && editing.id === i.id) editorSync();
+      log('file', 'Страница переписана: ' + (l.node.title || 'Без названия'), null, () => {
+        const cur = findAnyNode(i.id); if (!cur) return;
+        cur.node.blocks = JSON.parse(old); touch(cur.k); refreshTree(cur.k); if (editing && editing.id === i.id) editorSync();
+      });
+      return { ok:true, blocks:nb.length };
     }),
     T('read_board', 'Read all cards on the board of a page from "plans" or "ideas": notes (text), checklists (title, items), images/videos (file name, caption), sketches, links, freehand drawings (ink). Card ids are needed for look_at_image.', { pageId:{ type:'string' } }, ['pageId'], async i => {
       const p = boardPage(i.pageId);
@@ -184,11 +223,41 @@ function aiTools(logEl){
       log('board', 'Прочитана доска: ' + (p.title || 'Без названия') + ' (карточек: ' + cards.length + ')');
       return { page:p.title, cards };
     }),
-    T('add_board_card', 'Add a note or a checklist card to the board of a page from "plans" or "ideas". For type "checklist": if text has several lines, the first line is the title and every other line is an item ("[x] " prefix = done). x/y are optional board coordinates; without them the card is placed in free space without overlapping other cards.', { pageId:{ type:'string' }, type:{ type:'string', enum:['note', 'checklist'] }, text:{ type:'string' }, x:{ type:'number' }, y:{ type:'number' } }, ['pageId', 'type', 'text'], async i => {
+    T('add_board_card', 'Add a card to the board of a page from "plans" or "ideas": a note (text with **bold**, "- " lists, "[ ] " checkboxes; use a short bold first line as a heading), a checklist (first line = title, every other line = item, "[x] " = done) or a link (text = URL, title optional). x/y are optional board coordinates (pixels, x to the right, y down); without them the card goes to free space without overlapping. color (note/checklist): yellow, green, blue, pink, purple or empty.', { pageId:{ type:'string' }, type:{ type:'string', enum:['note', 'checklist', 'link'] }, text:{ type:'string' }, title:{ type:'string' }, x:{ type:'number' }, y:{ type:'number' }, color:{ type:'string' } }, ['pageId', 'type', 'text'], async i => {
       const p = boardPage(i.pageId), text = String(i.text || '').trim(); if (!text) throw new Error('text is empty');
+      if (i.type === 'link') {
+        const it = await boardApi.addLink(ownerKey(p), text, i.title, i.x, i.y);
+        log('link', 'Ссылка добавлена на доску «' + (p.title || 'Без названия') + '»: ' + it.url);
+        return { ok:true, id:it.id };
+      }
       const it = await boardApi.addCard(ownerKey(p), i.type === 'checklist' ? 'checklist' : 'note', text.slice(0, 8000), i.x, i.y);
+      if (i.color) { try { await boardApi.updateCard(ownerKey(p), it.id, { color:String(i.color) }); } catch (e) {} }
       log('board', (it.type === 'checklist' ? 'Чек-лист' : 'Заметка') + ' добавлен' + (it.type === 'checklist' ? '' : 'а') + ' на доску «' + (p.title || 'Без названия') + '»');
       return { ok:true, id:it.id };
+    }),
+    T('arrange_board_cards', 'Move and/or resize cards on a page board to organize the space: group related cards, align them, leave even gaps (24 px is the usual gap), avoid overlaps. Coordinates are board pixels (x right, y down) as returned by read_board; give only the cards that change. Images and drawings keep their proportions (give w only).', { pageId:{ type:'string' }, moves:{ type:'array', maxItems:500, items:{ type:'object', properties:{ id:{ type:'string' }, x:{ type:'number' }, y:{ type:'number' }, w:{ type:'number' }, h:{ type:'number' } }, required:['id'] } } }, ['pageId', 'moves'], async i => {
+      const p = boardPage(i.pageId);
+      const r = await boardApi.moveCards(ownerKey(p), i.moves);
+      log('board', 'Переставлено карточек на доске «' + (p.title || 'Без названия') + '»: ' + r.result.moved, null, r.changed ? r.undo : null);
+      return { ok:true, moved:r.result.moved, missing:r.result.missing };
+    }),
+    T('tidy_board', 'Automatically lay out cards of a page board: "grid" — neat grid with even gaps, "columns" — one column per card type (notes, checklists, links, images, videos, sketches, drawings), "row" — single row. cardIds limits it to some cards (default: all).', { pageId:{ type:'string' }, layout:{ type:'string', enum:['grid', 'columns', 'row'] }, cardIds:{ type:'array', items:{ type:'string' } } }, ['pageId', 'layout'], async i => {
+      const p = boardPage(i.pageId);
+      const r = await boardApi.arrangeCards(ownerKey(p), i.layout, i.cardIds);
+      log('board', 'Доска «' + (p.title || 'Без названия') + '» разложена ' + ({ grid:'сеткой', columns:'колонками по типу', row:'в ряд' }[i.layout] || 'сеткой'), null, r.changed ? r.undo : null);
+      return { ok:true, arranged:r.result.arranged };
+    }),
+    T('update_board_card', 'Change a card on a page board: note text, checklist title/items, color (note/checklist: yellow, green, blue, pink, purple, "" for none), link title/url, caption of an image/video/sketch.', { pageId:{ type:'string' }, cardId:{ type:'string' }, text:{ type:'string' }, title:{ type:'string' }, items:{ type:'array', items:{ type:'object', properties:{ text:{ type:'string' }, done:{ type:'boolean' } }, required:['text'] } }, color:{ type:'string' }, url:{ type:'string' }, caption:{ type:'string' } }, ['pageId', 'cardId'], async i => {
+      const p = boardPage(i.pageId);
+      const r = await boardApi.updateCard(ownerKey(p), i.cardId, i);
+      log('pencil', 'Изменена карточка на доске «' + (p.title || 'Без названия') + '»', null, r.changed ? r.undo : null);
+      return { ok:true };
+    }),
+    T('remove_board_cards', 'Remove cards from a page board. ONLY when the user explicitly asks to delete or clean up specific cards.', { pageId:{ type:'string' }, ids:{ type:'array', items:{ type:'string' } } }, ['pageId', 'ids'], async i => {
+      const p = boardPage(i.pageId);
+      const r = await boardApi.removeCards(ownerKey(p), i.ids);
+      log('trash', 'Удалено с доски «' + (p.title || 'Без названия') + '»: ' + r.result.removed, null, r.changed ? r.undo : null);
+      return { ok:true, removed:r.result.removed };
     }),
     T('look_at_image', 'Look at an image, sketch or freehand drawing (ink) card from a page board (the picture is sent to you). Use ONLY when the user explicitly asks to look at, describe or analyze a picture. Get card ids from read_board.', { cardId:{ type:'string' } }, ['cardId'], async i => {
       if (!boardApi) throw new Error('Boards are not available');
@@ -218,11 +287,12 @@ async function aiSend(text){
   try {
     const res = await sample(msgs, {
       tools:aiTools(logEl), cache:false, modelTier:'default', signal:aiCtrl.signal,
-      onText:({ text:t }) => { md.className = 'md'; md.innerHTML = mdLite(t); aiMsgs.scrollTop = aiMsgs.scrollHeight; }
+      onText:({ text:t }) => { md.className = 'md'; md.innerHTML = mdLite(t); decorateCode(md); aiMsgs.scrollTop = aiMsgs.scrollHeight; }
     });
     md.className = 'md';
     const final = (res && res.text) || '';
     md.innerHTML = mdLite(final || (logEl.children.length ? 'Готово.' : '…'));
+    decorateCode(md);
     aiHistory.push({ role:'user', content:text }, { role:'assistant', content:final || 'Готово.' });
   } catch (e) {
     md.className = 'md';

@@ -143,8 +143,8 @@ test.describe.serial('Доска страницы', () => {
     const iz = await page.evaluate(() => parseFloat(document.querySelector('.bd-world').style.getPropertyValue('--iz')));
     const moved = await waitBoard(page, taskId, d => { const n = d.items.find(i => i.type === 'note'); return n.x !== before.x; });
     const n1 = moved.items.find(i => i.type === 'note');
-    expect(Math.abs((n1.x - before.x) - 100 * iz)).toBeLessThan(3);      // 100 px экрана = 100/масштаб на холсте
-    expect(Math.abs((n1.y - before.y) - 60 * iz)).toBeLessThan(3);
+    expect(Math.abs((n1.x - before.x) - 100 * iz)).toBeLessThan(3 + 6 * iz);   // 100 px экрана = 100/масштаб; ± притяжение к соседним (6 px)
+    expect(Math.abs((n1.y - before.y) - 60 * iz)).toBeLessThan(3 + 6 * iz);
     // изменение размера за угол
     const rs = note.locator('.bd-rs');
     const rb = await rs.boundingBox();

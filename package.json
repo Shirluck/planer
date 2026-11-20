@@ -73,6 +73,7 @@
       "lib/**/*.js",
       "src/**/*.{js,css}",
       "build/icon.png",
+      "build/icon.ico",
       "package.json",
       "!**/*.map"
     ],

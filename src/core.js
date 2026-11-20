@@ -16,7 +16,11 @@
   const newId = () => Math.random().toString(36).slice(2, 8) + Date.now().toString(36).slice(-4);
   const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
   const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
-  const BLOCK_TYPES = ['p', 'h', 'todo', 'ul'];
+  // Блоки текстовой страницы (как в Notion). Старый тип 'h' читается как 'h2'.
+  const BLOCK_TYPES = ['p', 'h1', 'h2', 'h3', 'ul', 'ol', 'todo', 'quote', 'callout', 'code', 'hr'];
+  /** @type {Object<string, string>} */
+  const BLOCK_ALIASES = { h: 'h2', heading: 'h2', text: 'p', paragraph: 'p', bullet: 'ul', list: 'ul', numbered: 'ol', number: 'ol', check: 'todo', checkbox: 'todo', task: 'todo', divider: 'hr' };
+  const INDENTABLE = ['p', 'ul', 'ol', 'todo'];
   const BLOCK_COLOR_IDS = ['blue', 'green', 'yellow', 'orange', 'pink', 'purple'];
 
   /* ---------- даты: ключ дня — 'ГГГГ-ММ-ДД' по местному времени ---------- */
@@ -53,8 +57,19 @@
   /** @param {any} b @returns {TimeBlock|null} */
   const normTimeBlock = b => (b && TIME_RE.test(b.from) && TIME_RE.test(b.to) && b.from < b.to)
     ? { id: String(b.id || newId()).slice(0, 40), from: b.from, to: b.to, title: String(b.title || '').slice(0, 60), color: BLOCK_COLOR_IDS.includes(b.color) ? b.color : 'blue' } : null;
-  /** @param {any} b */
-  const normBlock = b => ({ id: String(b.id || newId()), t: BLOCK_TYPES.includes(b.t) ? b.t : 'p', text: String(b.text || ''), done: !!b.done });
+  /** @param {any} t */
+  const blockType = t => BLOCK_TYPES.includes(t) ? t : BLOCK_ALIASES[t] || 'p';
+  /** Блок страницы: { id, t, text (с разметкой внутри строки), done, ind? 1..6, emoji? }. @param {any} b */
+  function normBlock(b) {
+    b = b || {};
+    const t = blockType(b.t);
+    /** @type {any} */
+    const o = { id: String(b.id || newId()).slice(0, 40), t, text: t === 'hr' ? '' : String(b.text == null ? '' : b.text).slice(0, 100000), done: t === 'todo' && !!b.done };
+    const ind = Math.min(6, Math.max(0, b.ind | 0));
+    if (ind && INDENTABLE.includes(t)) o.ind = ind;
+    if (t === 'callout') o.emoji = typeof b.emoji === 'string' && b.emoji.trim() && b.emoji.length <= 8 ? b.emoji.trim() : '💡';
+    return o;
+  }
   /** @param {any} n @returns {any} */
   function normNode(n) {
     if (n && n.type === 'folder') return { id: String(n.id || newId()), type: 'folder', title: String(n.title || ''), open: n.open !== false, children: (n.children || []).map(normNode) };
@@ -89,6 +104,131 @@
     const m = text.match(/\s*(!{1,3})$/);
     if (m && text.length > m[0].length) { pri = m[1].length; text = text.slice(0, text.length - m[0].length).trim(); }
     return { text, pri };
+  }
+
+  /* ---------- разметка внутри строки: **жирный**, *курсив*, ++подчёркнутый++, ~~зачёркнутый~~, `код`, [ссылка](https://…) ---------- */
+  /** @typedef {{text:string, b?:boolean, i?:boolean, u?:boolean, s?:boolean, code?:boolean, href?:string}} Seg */
+  const MARKS = [['**', 'b'], ['~~', 's'], ['++', 'u'], ['*', 'i']];
+  const SEG_KEYS = ['b', 'i', 'u', 's', 'code', 'href'];
+  /** @param {string} u */
+  const safeHref = u => /^(https?:\/\/|mailto:)[^\s<>"]+$/i.test(u) ? u : null;
+  /**
+   * Строка с разметкой → отрезки текста с пометками. Незакрытые символы остаются обычным текстом, «\» экранирует.
+   * @param {any} src @returns {Seg[]}
+   */
+  function parseInline(src) {
+    const s = String(src == null ? '' : src), out = /** @type {Seg[]} */ ([]);
+    /** @param {string} text @param {any} m */
+    const push = (text, m) => {
+      if (!text) return;
+      const last = /** @type {any} */ (out[out.length - 1]);
+      if (last && SEG_KEYS.every(k => (last[k] || false) === (m[k] || false))) last.text += text;
+      else out.push(Object.assign({ text }, m));
+    };
+    // закрывающий разделитель: содержимое не пустое и без пробела у границ; в серии «***» берётся последний
+    /** @param {string} d @param {number} from @param {number} z */
+    const closer = (d, from, z) => {
+      let j = s.indexOf(d, from);
+      while (j >= 0 && j < z) {
+        if (s[j - 1] === '\\') { j = s.indexOf(d, j + 1); continue; }
+        let e = j;                                          // конец серии одинаковых символов («***»)
+        while (e + 1 < z && s[e + 1] === d[0]) e++;
+        const len = e - j + 1, next = e + 1;
+        if (d === '*' && len === 2) { j = s.indexOf(d, next); continue; }   // «**» внутри курсива — жирный, не конец курсива
+        // после серии сразу слово — значит, лишние символы открывают следующую пометку: закрываем первыми
+        const opensNext = next < z && /[^\s*~+`]/.test(s[next]);
+        const k = opensNext ? j : e - d.length + 1;
+        if (len >= d.length && k > from && s[from] !== ' ' && s[k - 1] !== ' ') return k;
+        j = s.indexOf(d, next);
+      }
+      return -1;
+    };
+    /** @param {number} a @param {number} z @param {any} m */
+    function run(a, z, m) {
+      let i = a, buf = '';
+      const flush = () => { push(buf, m); buf = ''; };
+      while (i < z) {
+        const c = s[i];
+        if (c === '\\' && i + 1 < z) { buf += s[i + 1]; i += 2; continue; }
+        if (c === '`') {
+          const j = s.indexOf('`', i + 1);
+          if (j > i + 1 && j < z) { flush(); push(s.slice(i + 1, j), { code: true, href: m.href }); i = j + 1; continue; }
+        }
+        if (c === '[' && !m.href) {
+          const mid = s.indexOf('](', i + 1), end = mid > 0 ? s.indexOf(')', mid + 2) : -1;
+          const href = end > 0 && end < z ? safeHref(s.slice(mid + 2, end)) : null;
+          if (href && mid > i + 1) { flush(); run(i + 1, mid, Object.assign({}, m, { href })); i = end + 1; continue; }
+        }
+        let hit = null;
+        for (const [d, k] of MARKS) {
+          if (!s.startsWith(d, i) || m[k]) continue;
+          const j = closer(d, i + d.length, z);
+          if (j > 0) { hit = { d, k, j }; break; }
+        }
+        if (hit) { flush(); run(i + hit.d.length, hit.j, Object.assign({}, m, { [hit.k]: true })); i = hit.j + hit.d.length; continue; }
+        buf += c; i++;
+      }
+      flush();
+    }
+    run(0, s.length, {});
+    return out;
+  }
+  /** Экранирование обычного текста, чтобы он не стал разметкой. @param {string} t */
+  const mdEscape = t => String(t).replace(/[\\*~`]/g, '\\$&').replace(/\+\+/g, '\\+\\+');
+  /** Отрезки → строка с разметкой (обратное к parseInline). @param {Seg[]} segs */
+  function inlineToMd(segs) {
+    return segs.map(g => {
+      let t = g.code ? '`' + g.text.replace(/`/g, "'") + '`' : mdEscape(g.text);
+      if (!g.code && g.text.trim()) for (const [d, k] of MARKS.slice().reverse()) if (/** @type {any} */ (g)[k]) t = d + t + d;
+      return g.href ? '[' + t + '](' + g.href + ')' : t;
+    }).join('');
+  }
+  /** Текст без разметки — для поиска, счётчиков и подсказок. @param {any} s */
+  const mdPlain = s => parseInline(s).map(g => g.text).join('');
+
+  /* ---------- блоки ↔ Markdown (вставка текста, копирование, ассистент) ---------- */
+  /** @param {any[]} blocks */
+  function blocksToMarkdown(blocks) {
+    const out = [];
+    /** @type {number[]} */
+    let num = [];
+    for (const raw of blocks) {
+      const b = normBlock(raw), ind = b.ind || 0, pad = '  '.repeat(ind);
+      if (b.t === 'ol') { num = num.slice(0, ind + 1); num[ind] = (num[ind] || 0) + 1; } else num = num.slice(0, ind);
+      out.push(b.t === 'h1' ? '# ' + b.text : b.t === 'h2' ? '## ' + b.text : b.t === 'h3' ? '### ' + b.text
+        : b.t === 'ul' ? pad + '- ' + b.text : b.t === 'ol' ? pad + num[ind] + '. ' + b.text
+        : b.t === 'todo' ? pad + '- [' + (b.done ? 'x' : ' ') + '] ' + b.text
+        : b.t === 'quote' ? '> ' + b.text.replace(/\n/g, '\n> ')
+        : b.t === 'callout' ? '> ' + b.emoji + ' ' + b.text.replace(/\n/g, '\n> ')
+        : b.t === 'code' ? '```\n' + b.text + '\n```' : b.t === 'hr' ? '---' : pad + b.text);
+    }
+    return out.join('\n');
+  }
+  /** Текст (в том числе Markdown) → блоки страницы. Пустые строки пропускаются. @param {any} text */
+  function markdownToBlocks(text) {
+    const lines = String(text == null ? '' : text).replace(/\r\n?/g, '\n').split('\n');
+    const out = [];
+    for (let i = 0; i < lines.length; i++) {
+      const raw = lines[i];
+      if (/^\s*```/.test(raw)) {
+        const body = [];
+        for (i++; i < lines.length && !/^\s*```\s*$/.test(lines[i]); i++) body.push(lines[i]);
+        out.push(normBlock({ t: 'code', text: body.join('\n') }));
+        continue;
+      }
+      if (!raw.trim()) continue;
+      const lead = (raw.match(/^[ \t]*/) || [''])[0].replace(/\t/g, '  ').length, ind = Math.min(6, Math.floor(lead / 2));
+      const l = raw.trim();
+      let m;
+      if ((m = l.match(/^(#{1,3})\s+(.*)$/))) out.push(normBlock({ t: 'h' + m[1].length, text: m[2] }));
+      else if (/^(-{3,}|\*{3,}|_{3,})$/.test(l)) out.push(normBlock({ t: 'hr' }));
+      else if ((m = l.match(/^[-*•]\s+\[( |x|X)?\]\s*(.*)$/)) || (m = l.match(/^\[( |x|X)?\]\s+(.*)$/))) out.push(normBlock({ t: 'todo', done: !!m[1] && m[1] !== ' ', text: m[2], ind }));
+      else if ((m = l.match(/^[-*•]\s+(.*)$/))) out.push(normBlock({ t: 'ul', text: m[1], ind }));
+      else if ((m = l.match(/^\d+[.)]\s+(.*)$/))) out.push(normBlock({ t: 'ol', text: m[1], ind }));
+      else if ((m = l.match(/^>\s?(.*)$/))) out.push(normBlock({ t: 'quote', text: m[1] }));
+      else out.push(normBlock({ t: 'p', text: l, ind }));
+    }
+    return out;
   }
 
   /* ---------- поиск: без учёта регистра и «ё», все слова запроса должны встретиться ---------- */
@@ -222,7 +362,8 @@
   }
 
   return {
-    newId, DATE_RE, TIME_RE, BLOCK_TYPES, BLOCK_COLOR_IDS,
+    newId, DATE_RE, TIME_RE, BLOCK_TYPES, BLOCK_COLOR_IDS, INDENTABLE, blockType,
+    parseInline, inlineToMd, mdEscape, mdPlain, blocksToMarkdown, markdownToBlocks,
     pad2, dkey, todayKey, parseKey, isDateKey, addDays, mondayOf, monthOf, addMonths, cap, plural,
     normTask, normTimeBlock, normBlock, normNode, normCal, parseNewTask,
     normSearch, searchTokens, matchScore, matchRanges, snippet, search,

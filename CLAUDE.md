@@ -12,15 +12,31 @@
   `base` (`h()`, `icon()`/`IC`, `autosize()`, модель `S`, `SECTIONS`, `normalize`, `findTask`, `findNode`; чистые функции берёт из `PlanerCore`),
   `store` (`touch(k)` помечает раздел изменённым и сохраняет с задержкой, `flush`, `flushEverything`, `extraStore` для досок, `pendingSave`,
   `toast`, `openMenu`/`placePopup`, `menuEl` — один открытый поповер), `columns` (`buildBoard`, списки задач `itemEl`, блоки времени),
-  `drag` (`tdrag`), `calendar` («Сегодня», «Неделя», окно дня `openDay`), `tree` (`buildTreeCol`, `openFile`, `findOwner`), `editor` (`openPage`),
-  `ai` (`aiTools`, `buildPrompt`, `aiSend`), `timers` (`TM`, `openTimers`, `ringTimer`, звук Web Audio `playSound`), `search` (`openSearch`,
+  `drag` (`tdrag`; группа = выделенные задачи), `select` (`TSEL`, `tselClick`, `paintTsel` — панель действий, `moveTasks`/`bulkTasks`/`deleteTasks`
+  — одна отмена на всё), `calendar` («Сегодня», «Неделя», окно дня `openDay`), `tree` (`buildTreeCol`, `openFile`, `findOwner`),
+  `editor` (`openPage`; блочный редактор как в Notion, состояние `NE`, см. ниже),
+  `ai` (`aiTools`, `buildPrompt`, `aiSend`; `log(…, undo)` — кнопка «Вернуть как было»), `timers` (`TM`, `openTimers`, `ringTimer`,
+  звук Web Audio `playSound`), `tools` («Моушн»: `MT`, `openTools(tab)`, ссылки в документе `planner-tools`), `search` (`openSearch`,
   `revealTask`, `revealNode`), `settings` (`SET`, `setUi`, `openSettings`, `openRestore`, `applyRestored`), `mini-host` (ответы мини-окну, `miniNotify`),
   `boot` (`createBoards`, `runCommand` — команды меню/трея, `main()`).
+  **Имена верхнего уровня во всех этих файлах общие и не должны повторяться** (иначе последняя функция молча заменит первую) —
+  проверяет `tests/unit/globals.test.js`. Внутренние помощники редактора — с префиксом `ne` (`neBlockMenu`, `neDeleteBlock`).
+- Редактор страниц (`editor.js`): один `contenteditable` `.ne` с блоками `.nb[data-id][data-t]`; модель — `blocks` из `core.normBlock`.
+  Смещения курсора — в символах простого текста блока (`<br>` = 1, последний `<br>` блока — заглушка): `selInfo`/`setSel`.
+  Ввод перехватывается в `beforeinput` (Enter, Backspace/Delete на краю блока, замена выделения через блоки), внутри блока
+  правит браузер, затем `syncDom` переводит DOM в Markdown (`inlineToMd`). Своя история `NE.undo/redo`, изменения — через `commit(before, caret)`.
 - `src/core.js` — чистая логика без DOM (UMD: `window.PlanerCore` и `require`): даты, `normCal`/`normNode`, `parseNewTask`, поиск
-  (`search`, `matchRanges`, `snippet`; без учёта регистра и «ё»), таймеры (`parseDuration`, `fmtClock`, `normTimers`). Покрыт `tests/unit`.
-- `src/board.js` — доска: `PlanerBoard.create(ctx)` → `{ open, close, flush, readBoard, addCard, findCard, imageForAI, reveal, forget, … }`.
+  (`search`, `matchRanges`, `snippet`; без учёта регистра и «ё»), таймеры (`parseDuration`, `fmtClock`, `normTimers`),
+  блоки страниц (`BLOCK_TYPES`, `normBlock`) и Markdown (`parseInline`, `inlineToMd`, `mdPlain`, `blocksToMarkdown`, `markdownToBlocks`). Покрыт `tests/unit`.
+- `src/motion.js` — чистая логика «Моушн» (UMD: `window.PlanerMotion`): `EXPRESSIONS` + `buildExpression(id, params)`, кадры/таймкод,
+  `beatFrames`, `parseColor`/`colorFormats`, `FORMATS`, `aspect`. Покрыт `tests/unit/motion.test.js`.
+- `src/board.js` — доска: `PlanerBoard.create(ctx)` → `{ open, close, flush, readBoard, addCard, addLink, findCard, imageForAI, reveal, forget,
+  moveCards, arrangeCards, updateCard, removeCards, … }`.
   Холст = DOM + CSS transform (`.bd-world`), карточки — абсолютные элементы; отрисовка ключевая (`renderAll` сравнивает подпись карточки).
   История отмены — снимки JSON массива `items` (100 шагов, на доску, живёт сессию). `change(fn)` = изменение с записью в историю.
+  Правки от ассистента — `editBoard(key, fn)`: `fn` возвращает `{result, revert}`, наружу `{result, undo}`; `undo` откатывает только
+  это действие (по id карточек), а не весь снимок. Инструменты `navTool` 'select'|'hand' (V/H), рамка по пустому месту,
+  `alignSel`/`distributeSel`/`tidySel`, притяжение `snapMove` (порог `SNAP`, Alt — без него) с направляющими `.bd-guides`.
   Рисование от руки: режим `B.draw` (`toggleDraw`, `startInk`, `commitInk`, `startErase`), живой слой `B.inkLive`, панель `B.inkBar`.
 - `src/sketch.js` — редактор зарисовок `PlanerSketch.open(opts)` → Promise; общие `drawStrokes`, `drawBackground`.
 - `mini.html`, `src/mini.js`, `src/mini.css` — мини-окно «Сегодня»: своих данных нет, всё через `electronAPI.mini.call` → основной процесс → главное окно.
@@ -58,7 +74,11 @@
   Медиа только ссылкой (`mediaId` = sha256), никакого base64. Зарисовка: `mediaId` (PNG) + `strokesId` (векторы); рисунок поверх фото — `overlay`.
   Рисунок от руки `ink`: `vw, vh` (система координат штрихов, карточка растягивает её на `w×h` без искажения),
   `strokes:[{c: 'ink'|'red'|'orange'|'green'|'blue'|'purple', w, m?:1 (маркер), p:[x,y,…]}]` — числа прямо в JSON (это векторы, не медиа).
+- Блок страницы: `{id, t, text, done?, ind?, emoji?}`, `t` ∈ `p|h1|h2|h3|ul|ol|todo|quote|callout|code|hr`; `text` — строчный Markdown
+  (`**ж**`, `*к*`, `++п++`, `~~з~~`, `` `код` ``, `[т](https://…)`, `\` — экранирование; в `code` — как есть); `ind` 0..6 только у `p|ul|ol|todo`;
+  `done` только у `todo`; `emoji` только у `callout`. Старые блоки без форматирования читаются как есть.
 - Таймеры: документ `planner-timers` = `{ v:1, presets:[{id,title,ms}], sound:'bell'|'soft'|'alarm'|'beep', volume 0..1, repeat 1..10 }`.
+- «Моушн»: документ `planner-tools` = `{ v:1, links:[{id,title,url}] }` (через `extraStore`); вкладка, fps и параметры — `localStorage` `planer-motion`.
 - На диске: `%APPDATA%\Planer\` (`docs/`, `media/`, `backups/`, `planer-meta.json`, `api-key.bin`, `claude-work/`,
   `settings.json` = `{aiMode:'claude-code'|'api', ccModel, claudePath?, theme:'system'|'light'|'dark', zoom 0.8…1.5, compact, autostart}`).
   `PLANER_DATA_DIR` — другая папка (тесты). Без `aiMode`: есть ключ → `api`, иначе `claude-code`.

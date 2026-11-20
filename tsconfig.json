@@ -17,5 +17,5 @@
     "skipLibCheck": true,
     "resolveJsonModule": true
   },
-  "include": ["main.js", "preload.js", "lib/**/*.js", "src/core.js", "tests/unit/**/*.js"]
+  "include": ["main.js", "preload.js", "lib/**/*.js", "src/core.js", "src/motion.js", "tests/unit/**/*.js"]
 }

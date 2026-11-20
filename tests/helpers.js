@@ -72,7 +72,8 @@ const isoDay = (offset = 0) => { const d = new Date(); d.setDate(d.getDate() + o
 const calDoc = page => page.evaluate(p => window.electronAPI.dbGet(p), DOC('planner-cal'));
 async function waitCal(page, pred, msg) {
   let last = null;
-  await expect.poll(async () => { last = await calDoc(page); return !!(last && pred(last)); }, { message: msg || 'calendar doc', timeout: 15000 }).toBe(true);
+  const ok = d => { try { return !!(d && pred(d)); } catch (_) { return false; } };   // документа или дня ещё нет — просто «нет»
+  await expect.poll(async () => { last = await calDoc(page); return ok(last); }, { message: msg || 'calendar doc', timeout: 15000, intervals: [100, 200, 300, 500] }).toBe(true);
   return last;
 }
 const boardDoc = (page, taskId) => page.evaluate(p => window.electronAPI.dbGet(p), DOC('board-' + taskId));

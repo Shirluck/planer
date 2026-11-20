@@ -26,6 +26,10 @@ const isMac = process.platform === 'darwin';
 const dir = () => app.getPath('userData');
 const keyFile = () => path.join(dir(), 'api-key.bin');
 const iconFile = path.join(__dirname, 'build', 'icon.png');
+// На Windows окна и трей берут .ico с готовыми маленькими размерами (16–256 px, подогнаны под пиксели) —
+// так значок в панели задач и в трее совпадает с ярлыком; из PNG 1024 px Windows уменьшала бы сама, и он выглядел бы иначе.
+const icoFile = path.join(__dirname, 'build', 'icon.ico');
+const appIcon = () => (process.platform === 'win32' && fs.existsSync(icoFile) ? icoFile : fs.existsSync(iconFile) ? iconFile : undefined);
 /** @type {BrowserWindow|null} */
 let win = null;
 /** @type {BrowserWindow|null} */
@@ -395,7 +399,7 @@ function createWindow() {
   win = new BrowserWindow({
     width: 1500, height: 920, minWidth: 760, minHeight: 560, show,
     title: 'Планер', backgroundColor: themeBg(), autoHideMenuBar: true,
-    icon: fs.existsSync(iconFile) ? iconFile : undefined,
+    icon: appIcon(),
     webPreferences: webPrefs()
   });
   win.loadFile(path.join(__dirname, 'index.html'));
@@ -495,8 +499,9 @@ function buildTrayMenu() {
   tray.setContextMenu(Menu.buildFromTemplate(tpl));
 }
 function createTray() {
-  if (!fs.existsSync(iconFile)) return;
-  const img = nativeImage.createFromPath(iconFile).resize({ width: isMac ? 18 : 32, height: isMac ? 18 : 32, quality: 'best' });
+  const file = appIcon(); if (!file) return;
+  const img = file.endsWith('.ico') ? nativeImage.createFromPath(file)     // Windows сама выберет 16/24/32 px под масштаб экрана
+    : nativeImage.createFromPath(file).resize({ width: isMac ? 18 : 32, height: isMac ? 18 : 32, quality: 'best' });
   tray = new Tray(img);
   tray.setToolTip('Планер');
   updateTray(true);
@@ -516,7 +521,7 @@ function createMini() {
   mini = new BrowserWindow({
     width: MINI_W, height: MINI_H, show: false, frame: false, resizable: false, minimizable: false, maximizable: false, fullscreenable: false,
     skipTaskbar: true, alwaysOnTop: true, title: 'Планер — сегодня', backgroundColor: themeBg(),
-    icon: fs.existsSync(iconFile) ? iconFile : undefined, webPreferences: webPrefs()
+    icon: appIcon(), webPreferences: webPrefs()
   });
   mini.loadFile(path.join(__dirname, 'mini.html'));
   lockNavigation(mini, 'mini.html');
@@ -582,7 +587,9 @@ function buildMenu() {
     { role: 'windowMenu', label: 'Окно' },
     { label: 'Таймеры', submenu: [
       { label: 'Таймеры…', click: () => pageCommand('timers') },
-      { label: 'Остановить все таймеры', click: () => timers.stopAll() }
+      { label: 'Остановить все таймеры', click: () => timers.stopAll() },
+      { type: 'separator' },
+      { label: 'Моушн: ссылки, экспрешены, тайминг…', click: () => pageCommand('tools') }
     ] },
     { label: 'Ассистент', submenu: [
       { label: 'Через подписку Claude (Claude Code)', type: 'radio', checked: ai.mode === 'claude-code', click: () => setAi({ mode: 'claude-code' }) },

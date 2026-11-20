@@ -15,7 +15,8 @@ test('поиск находит задачи, страницы, карточки
     // текстовая страница с текстом
     await addPage(page, 'plans', 'Отпуск', 'text');
     await page.locator('.node.page', { hasText: 'Отпуск' }).dblclick();
-    await page.locator('.sheet .b-in').first().fill('Посчитать бюджет поездки');
+    await page.locator('.ne .nb').first().click();
+    await page.keyboard.type('Посчитать бюджет поездки');
     await page.keyboard.press('Escape');
     // доска с заметкой
     const boardId = await addPage(page, 'ideas', 'Сад');
@@ -67,8 +68,8 @@ test('поиск находит задачи, страницы, карточки
     await expect(page.locator('.sp-row').first().locator('.sp-title')).toHaveText('Отпуск');
     await page.keyboard.press('Enter');
     await expect(page.locator('.sheet .title-in')).toHaveValue('Отпуск');
-    expect(await page.evaluate(() => { const a = document.activeElement; return a.value.slice(a.selectionStart, a.selectionEnd); })).toBe('бюджет');
-    await page.keyboard.press('Escape');
+    expect(await page.evaluate(() => String(window.getSelection()))).toBe('бюджет');
+    await page.keyboard.press('Escape'); await page.keyboard.press('Escape');   // снять выделение, закрыть страницу
 
     // задача без даты, выбор стрелками
     await open('гараж');

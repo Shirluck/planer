@@ -30,6 +30,7 @@ function createBoards(){
 function runCommand(cmd, arg){
   if (cmd === 'search') openSearch();
   else if (cmd === 'timers') { if (SP.ov) closeSearch(); openTimers(); }
+  else if (cmd === 'tools') { if (SP.ov) closeSearch(); openTools(); }
   else if (cmd === 'settings') openSettings();
   else if (cmd === 'restore') openRestore();
   else if (cmd === 'task' && typeof arg === 'string') revealTask(arg);
@@ -64,7 +65,7 @@ if ('ResizeObserver' in window) new ResizeObserver(debounce(autosizeAll, 80)).ob
   board.classList.remove('loading');
   idleStatus();
   initAI();
-  initTimers(); initSearch(); initSettings(); initMiniHost();
+  initTimers(); initTools(); initSearch(); initSettings(); initMiniHost();
   if (ea && ea.onCommand) ea.onCommand(runCommand);
   if (ea && ea.notices) { try { const list = await ea.notices(); if (list && list.length) showBanner(list.join(' ')); } catch (e) {} }
 })();

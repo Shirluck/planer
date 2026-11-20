@@ -40,16 +40,22 @@ function startTaskDrag(row, sx, sy){
   const a = document.activeElement; if (a && row.contains(a) && a.blur) a.blur();
   try { window.getSelection().removeAllRanges(); } catch (e) {}
   const r = row.getBoundingClientRect();
+  const id = row.dataset.id;
+  // перетаскивание выделенной задачи уносит все выделенные (select.js)
+  const group = TSEL.ids.has(id) && TSEL.ids.size > 1 ? tselOrdered() : null;
+  if (!group) tselClear();
   const ghost = row.cloneNode(true);
   const srcTa = row.querySelectorAll('textarea');
   ghost.querySelectorAll('textarea').forEach((x, i) => { x.value = srcTa[i] ? srcTa[i].value : ''; });
-  ghost.classList.add('task-ghost'); ghost.classList.remove('drop-before', 'drop-after');
+  ghost.classList.add('task-ghost'); ghost.classList.remove('drop-before', 'drop-after', 'tsel');
   ghost.style.width = r.width + 'px';
   ghost.style.setProperty('--accent', getComputedStyle(row).getPropertyValue('--accent'));
   ghost.setAttribute('aria-hidden', 'true');
+  if (group) ghost.append(h('b', { class:'tg-count' }, String(group.length)));
   document.body.append(ghost);
-  tdrag = { id:row.dataset.id, row, ghost, dx:sx - r.left, dy:sy - r.top, target:null, x:sx, y:sy, scroll:null, raf:0 };
+  tdrag = { id, group, row, ghost, dx:sx - r.left, dy:sy - r.top, target:null, x:sx, y:sy, scroll:null, raf:0 };
   row.classList.add('drag-src'); document.body.classList.add('task-dragging');
+  if (group) document.querySelectorAll('.tsel:not(.task-ghost)').forEach(x => x.classList.add('drag-src'));
   autoScrollLoop();
 }
 function dragOverTask(x, y){
@@ -62,15 +68,16 @@ function dragOverTask(x, y){
   d.scroll = null;
   if (list) { const lr = list.getBoundingClientRect(); if (y < lr.top + 36) d.scroll = { list, dir:-1 }; else if (y > lr.bottom - 36) d.scroll = { list, dir:1 }; }
   const it = el.closest('.item[data-id], .wk-task[data-id]');
-  if (it && it !== d.row && it.closest('.tz') && !it.closest('.task-ghost')) {
+  const own = x => x === d.row || (d.group && d.group.includes(x.dataset.id));   // сама перетаскиваемая (или из группы)
+  if (it && !own(it) && it.closest('.tz') && !it.closest('.task-ghost')) {
     const zone = it.closest('.tz'), r = it.getBoundingClientRect(), after = y > r.top + r.height / 2;
     let before = it.dataset.id;
-    if (after) { let n = it.nextElementSibling; while (n && (!n.dataset.id || n === d.row)) n = n.nextElementSibling; before = n ? n.dataset.id : null; }
+    if (after) { let n = it.nextElementSibling; while (n && (!n.dataset.id || own(n))) n = n.nextElementSibling; before = n ? n.dataset.id : null; }
     it.classList.add(after ? 'drop-after' : 'drop-before');
     d.target = Object.assign(zoneTarget(zone), { beforeId:before });
     return;
   }
-  if (it === d.row) return;                                                // над собой — без изменений
+  if (it && own(it)) return;                                               // над собой — без изменений
   let zone = el.closest('.tz') || (el.closest('.tblock') && el.closest('.tblock').querySelector('.tz'));
   if (!zone && list && list.querySelector('.tz') && !el.closest('.wk-day')) { const zs = list.querySelectorAll('.tz'); zone = zs[zs.length - 1]; }
   if (zone) { zone.classList.add('drop-end'); d.target = Object.assign(zoneTarget(zone), { beforeId:null }); return; }
@@ -87,8 +94,9 @@ function autoScrollLoop(){
 function finishTaskDrag(cancel){
   const d = tdrag; tdrag = null; if (!d) return;
   cancelAnimationFrame(d.raf);
-  d.ghost.remove(); d.row.classList.remove('drag-src'); document.body.classList.remove('task-dragging'); clearDropMarks();
+  d.ghost.remove(); d.row.classList.remove('drag-src'); document.querySelectorAll('.drag-src').forEach(x => x.classList.remove('drag-src')); document.body.classList.remove('task-dragging'); clearDropMarks();
   justDragged = true; setTimeout(() => { justDragged = false; }, 0);
   if (cancel || !d.target) return;
-  moveTask(d.id, d.target.date, d.target.beforeId, d.target.block);
+  if (d.group) moveTasks(d.group, d.target.date, d.target.beforeId, d.target.block);
+  else moveTask(d.id, d.target.date, d.target.beforeId, d.target.block);
 }

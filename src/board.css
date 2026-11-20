@@ -302,3 +302,10 @@
 .bd-rail-btn.on{background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent)}
 .bd-rail-btn.on svg{color:var(--accent)}
 .bd-world .bd-card.t-ink{box-shadow:none}   /* сильнее тени карточек тёмной темы */
+/* инструменты холста, направляющие выравнивания */
+.bd-zb[aria-pressed=true]{background:color-mix(in srgb,var(--accent) 15%,transparent);color:var(--accent)}
+.bd-vp.bd-hand,.bd-vp.bd-hand .bd-card{cursor:grab}
+.bd-guides{position:absolute;left:0;top:0;width:0;height:0;pointer-events:none;z-index:2147482000}
+.bd-guide{position:absolute;left:0;top:0;background:#ff3b8b}
+.bd-guide.v{width:calc(1px * var(--iz))}
+.bd-guide.h{height:calc(1px * var(--iz))}

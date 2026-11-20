@@ -58,7 +58,7 @@ test('тип файла: текст или доска, иконки, двойн�
     await page.click('.menu-it:has-text("Сделать текстовым документом")');
     await expect(text).toHaveClass(/kind-text/);
     await text.locator('.n-title').dblclick();
-    await expect(page.locator('.sheet .b-in').first()).toHaveValue('Первая мысль');
+    await expect(page.locator('.ne .nb').first()).toHaveText('Первая мысль');
     await page.keyboard.press('Escape');
     expect(errors).toEqual([]);
   } finally { await closeApp(app); rmDir(dir); }
