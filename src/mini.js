@@ -61,7 +61,6 @@ function render(){
   });
   if (!all.length) rows.push(h('div', { class:'mn-empty' }, 'На сегодня дел нет. Добавьте первое ниже.'));
   else if (done === all.length) rows.push(h('div', { class:'mn-empty ok' }, 'Все дела на сегодня выполнены'));
-  if (data.overdue) rows.push(h('button', { class:'mn-overdue', type:'button', onclick:() => ea.mini.openMain({}) }, 'Не сделано в прошлые дни: ' + data.overdue));
   list.replaceChildren(...rows);
 }
 function row(t, color){

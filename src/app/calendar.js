@@ -34,7 +34,7 @@ function updateProgress(){
   c.n.textContent = all.length ? done + ' / ' + all.length : '';
   c.bar.style.width = all.length ? (done / all.length * 100) + '%' : '0%';
 }
-// невыполненное за последние 60 дней — в колонке не показывается; нужно ассистенту и мини-окну
+// невыполненное за последние 60 дней (на экране не показывается; ассистент сообщает, сколько их раньше окна календаря)
 function overdueTasks(){
   const today = todayKey(), from = addDays(today, -60), out = [];
   for (const [k, d] of Object.entries(S.cal.days)) if (k < today && k >= from) d.items.forEach(t => { if (!t.done) out.push({ date:k, t }); });

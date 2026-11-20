@@ -9,8 +9,7 @@ function miniToday(){
   return {
     date:k, title:cap(fmtDate(k, { weekday:'long', day:'numeric', month:'long' })),
     items:items.map(t => { const b = t.block && blocks.find(x => x.id === t.block); return { id:t.id, text:t.text, done:t.done, pri:t.pri, block:b ? label(b) : '', color:b ? b.color : '', from:b ? b.from : '' }; }),
-    blocks:blocks.map(b => ({ id:b.id, label:label(b), color:b.color, now:isNowIn(k, b) })),
-    overdue:overdueTasks().length
+    blocks:blocks.map(b => ({ id:b.id, label:label(b), color:b.color, now:isNowIn(k, b) }))
   };
 }
 const miniNotify = debounce(() => { const ea = window.electronAPI; if (ea && ea.miniHost) ea.miniHost.changed(); }, 120);

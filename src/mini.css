@@ -45,8 +45,6 @@ input{font:inherit;color:inherit}
 .mn-now{margin-left:auto;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;background:var(--bc);color:#fff;border-radius:5px;padding:0 5px}
 .mn-empty{color:var(--muted);text-align:center;padding:22px 12px;font-size:13px}
 .mn-empty.ok{color:var(--c-day);padding:10px}
-.mn-overdue{display:block;width:calc(100% - 8px);margin:8px 4px 0;padding:7px 10px;border-radius:9px;background:color-mix(in srgb,var(--p2) 12%,var(--panel));color:var(--text);font-size:12.5px;text-align:left}
-.mn-overdue:hover{background:color-mix(in srgb,var(--p2) 18%,var(--panel))}
 .mn-add{margin:0 10px 10px;padding:7px 12px;border:1px solid var(--line);border-radius:11px;background:var(--panel-2)}
 .mn-add:focus-within{border-color:var(--c-day);background:var(--panel)}
 .mn-add input{width:100%;border:0;outline:0;background:transparent}
