@@ -268,23 +268,6 @@ kbd{font:inherit;font-size:11.5px;background:var(--panel-2);border:1px solid var
 .wk.all .wk-task[data-pri="2"]::before{background:var(--p2)}
 .wk-task.done .wk-t{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--faint)}
 .wk-hint{color:var(--muted);font-size:12.5px;line-height:1.5;padding:12px 14px;text-align:center}
-/* today: unfinished tasks from previous days */
-.overdue{margin:12px 4px 4px;border:1px dashed var(--line-2);border-radius:11px;padding:2px}
-.od-head{display:flex;align-items:center;gap:7px;width:100%;padding:7px 9px;font-size:12.5px;color:var(--muted);border-radius:9px;text-align:left}
-.od-head:hover{background:var(--hover);color:var(--text)}
-.od-head svg{transition:transform .15s;flex:none}
-.overdue.open .od-head svg{transform:rotate(90deg)}
-.od-head b{margin-left:auto;background:color-mix(in srgb,var(--p2) 18%,transparent);color:var(--p2);padding:0 8px;border-radius:999px;font-size:11.5px}
-.od-row{display:flex;align-items:center;gap:6px;padding:3px 5px 3px 11px;font-size:13px;border-radius:8px}
-.od-row:hover{background:var(--hover)}
-.od-row[data-pri="3"] .od-t{font-weight:600}
-.od-t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.od-date{font-size:11.5px;color:var(--muted);padding:2px 7px;border-radius:6px;white-space:nowrap}
-.od-date:hover{background:var(--line);color:var(--text)}
-.od-move{width:26px;height:26px;border-radius:7px;display:grid;place-items:center;color:var(--accent);flex:none}
-.od-move:hover{background:var(--line)}
-.od-all{display:block;width:calc(100% - 12px);margin:4px 6px 6px;padding:6px;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent)}
-.od-all:hover{background:color-mix(in srgb,var(--accent) 16%,transparent)}
 /* day sheet */
 .sheet[data-key=week]{--accent:var(--c-week)}
 .day-sheet{width:min(660px,100%);height:min(82vh,780px)}

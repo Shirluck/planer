@@ -34,7 +34,7 @@ function updateProgress(){
   c.n.textContent = all.length ? done + ' / ' + all.length : '';
   c.bar.style.width = all.length ? (done / all.length * 100) + '%' : '0%';
 }
-let overdueOpen = false;
+// невыполненное за последние 60 дней — в колонке не показывается; нужно ассистенту и мини-окну
 function overdueTasks(){
   const today = todayKey(), from = addDays(today, -60), out = [];
   for (const [k, d] of Object.entries(S.cal.days)) if (k < today && k >= from) d.items.forEach(t => { if (!t.done) out.push({ date:k, t }); });
@@ -52,29 +52,8 @@ function refreshToday(){
   c.list.replaceChildren();
   if (!vis.length && !dayBlocks(today).length) c.list.append(h('div', { class:'empty' }, items.length ? 'Все дела на сегодня выполнены' : SECTIONS.day.empty));
   renderTaskGroups(c.list, today, vis);
-  const od = overdueTasks();
-  if (od.length) c.list.append(overdueEl(od));
   c.list.querySelectorAll('textarea').forEach(autosize);
   paintTsel();
-}
-function overdueEl(list){
-  const box = h('div', { class:'overdue' + (overdueOpen ? ' open' : '') },
-    h('button', { class:'od-head', type:'button', 'aria-expanded':String(overdueOpen), onclick:() => { overdueOpen = !overdueOpen; refreshToday(); } },
-      icon('chev', 14), h('span', {}, 'Не сделано в прошлые дни'), h('b', {}, String(list.length))));
-  if (overdueOpen) {
-    list.forEach(({ date, t }) => box.append(h('div', { class:'od-row', 'data-id':t.id, 'data-pri':t.pri },
-      h('span', { class:'od-t', title:t.text }, t.text || 'Без названия'),
-      h('button', { class:'od-date', type:'button', title:'Открыть этот день', onclick:() => openDay(date) }, fmtDate(date, { day:'numeric', month:'short' })),
-      h('button', { class:'od-move', type:'button', 'aria-label':'Перенести на сегодня: ' + t.text, title:'Перенести на сегодня', onclick:() => moveTask(t.id, todayKey()) }, icon('arrow', 14)))));
-    if (list.length > 1) box.append(h('button', { class:'od-all', type:'button', onclick:() => moveAllOverdue() }, 'Перенести все на сегодня'));
-  }
-  return box;
-}
-function moveAllOverdue(){
-  const od = overdueTasks(); if (!od.length) return;
-  const undo = undoer(['cal']), dest = dayItems(todayKey(), true);
-  od.forEach(({ t }) => { const loc = findTask(t.id); if (loc) { loc.arr.splice(loc.i, 1); delete t.block; dest.push(t); } });
-  pruneDays(); touch('cal'); refreshCal(); toast('Перенесено на сегодня: ' + tasksWord(od.length), undo);
 }
 
 /* ---------- колонка «Неделя»: календарь месяца + дни выбранной недели ---------- */

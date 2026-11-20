@@ -140,29 +140,21 @@ test.describe.serial('Календарь', () => {
   });
 });
 
-test('невыполненное с прошлых дней показывается в «Сегодня» и переносится', async () => {
+test('невыполненное с прошлых дней не попадает в «Сегодня» и остаётся на своих датах', async () => {
   const dir = tmpDataDir('overdue');
   fs.mkdirSync(path.join(dir, 'docs'), { recursive: true });
   fs.writeFileSync(path.join(dir, 'planer-meta.json'), JSON.stringify({ schema: 2 }));
   fs.writeFileSync(path.join(dir, 'docs', 'data__users__local__planner-cal.json'), JSON.stringify({ v: 1, days: {
-    [isoDay(-3)]: { items: [{ id: 'o1', text: 'Старый хвост', done: false, pri: 3, note: '' }, { id: 'o2', text: 'Сделано давно', done: true, pri: 0, note: '' }] },
+    [isoDay(-3)]: { items: [{ id: 'o1', text: 'Старый хвост', done: false, pri: 3, note: '' }] },
     [isoDay(-1)]: { items: [{ id: 'o3', text: 'Вчерашнее', done: false, pri: 0, note: '' }] }
   }, undated: [] }));
   const { app, page } = await launch(dir);
   try {
-    const box = page.locator(today + ' .overdue');
-    await expect(box.locator('.od-head b')).toHaveText('2');
-    await box.locator('.od-head').click();
-    await expect(box.locator('.od-row')).toHaveCount(2);
-    await box.locator('.od-row', { hasText: 'Старый хвост' }).locator('.od-move').click();
-    await expect(page.locator(today + ' .item .txt')).toHaveValue('Старый хвост');
-    await page.click(today + ' .od-head');
-    await expect(page.locator(today + ' .overdue .od-head b')).toHaveText('1');
-    await page.click(today + ' .overdue .od-head');
-    await page.locator(today + ' .od-row .od-move').click();
-    await expect(page.locator(today + ' .overdue')).toHaveCount(0);
-    const c = await waitCal(page, c => c.days[isoDay(0)] && c.days[isoDay(0)].items.length === 2);
-    expect(c.days[isoDay(-3)].items.map(t => t.text)).toEqual(['Сделано давно']);
-    expect(c.days[isoDay(-1)]).toBeUndefined();
+    await expect(page.locator(today + ' .empty')).toBeVisible();
+    await expect(page.locator(today)).not.toContainText('прошлые дни');
+    await expect(page.locator(today + ' .item')).toHaveCount(0);
+    const c = await waitCal(page, c => !!c.days[isoDay(-3)]);
+    expect(c.days[isoDay(-3)].items.map(t => t.text)).toEqual(['Старый хвост']);
+    expect(c.days[isoDay(-1)].items.map(t => t.text)).toEqual(['Вчерашнее']);
   } finally { await closeApp(app); rmDir(dir); }
 });
