@@ -32,7 +32,7 @@
     "test:e2e": "playwright test --project=app",
     "test:packaged": "node scripts/packaged-check.js && playwright test --project=packaged",
     "icons": "node scripts/make-icon.js",
-    "dist": "electron-builder",
+    "dist": "electron-builder --publish never",
     "dist:dir": "electron-builder --dir",
     "release": "node scripts/release.js"
   },
@@ -46,6 +46,7 @@
     "typescript": "5.9.3"
   },
   "build": {
+    "publish": { "provider": "github", "owner": "Shirluck", "repo": "planer", "releaseType": "release" },
     "appId": "local.planer.desktop",
     "productName": "Планер",
     "executableName": "Planer",
@@ -134,5 +135,8 @@
       "icon": "build/icon.png",
       "artifactName": "Planer-${version}.${ext}"
     }
+  },
+  "dependencies": {
+    "electron-updater": "6.8.11"
   }
 }

@@ -132,7 +132,7 @@ async function flush(k){
   } catch (e) {
     setStatus('error');
     showBanner('Не удалось сохранить: ' + ((e && (e.code || e.message)) || 'ошибка') + '. Изменения остаются на экране; попробуйте ещё раз после следующей правки.');
-    writing[k] = false; return;
+    dirty.add(k); writing[k] = false; return;
   }
   writing[k] = false;
   if (again[k] || dirty.has(k)) { again[k] = false; clearTimeout(timers[k]); timers[k] = setTimeout(() => flush(k), 300); }
@@ -141,9 +141,11 @@ async function flush(k){
 function flushAll(){ KEYS.forEach(k => { if (dirty.has(k)) { clearTimeout(timers[k]); flush(k); } }); }
 // Дописать всё несохранённое (перед закрытием окна): разделы и доски.
 async function flushEverything(){
-  if (boardApi) { try { await boardApi.flush(); } catch (e) {} }
+  let boardSaved = true;
+  if (boardApi) { try { boardSaved = await boardApi.flush() !== false; } catch (e) { boardSaved = false; } }
   flushAll();
   for (let i = 0; i < 100 && (dirty.size || Object.values(writing).some(Boolean)); i++) { await new Promise(r => setTimeout(r, 20)); flushAll(); }
+  return boardSaved && !dirty.size && !Object.values(writing).some(Boolean) && !extraPending.size;
 }
 
 /* Отдельные документы (доски задач): тот же бэкенд, что и у разделов */

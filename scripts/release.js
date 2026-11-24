@@ -142,8 +142,14 @@ function sha256(file) { return crypto.createHash('sha256').update(fs.readFileSyn
   step('Проверка собранной программы');
   if (!npm('run', 'test:packaged')) { restore(); fail('собранная программа не прошла проверку.'); }
   const dist = path.join(ROOT, 'dist');
-  const assets = ['Planer-Setup-' + version + '.exe', 'Planer-' + version + '-portable.exe'].map(f => path.join(dist, f));
+  const assets = ['Planer-Setup-' + version + '.exe', 'Planer-' + version + '-portable.exe', 'latest.yml', 'Planer-Setup-' + version + '.exe.blockmap'].map(f => path.join(dist, f));
   for (const f of assets) if (!fs.existsSync(f)) { restore(); fail('нет файла сборки ' + f); }
+  const manifest = fs.readFileSync(path.join(dist, 'latest.yml'), 'utf8');
+  const digest = crypto.createHash('sha512').update(fs.readFileSync(assets[0])).digest('base64');
+  if (!manifest.split(/\r?\n/).includes('version: ' + version) ||
+      !manifest.includes('path: ' + path.basename(assets[0])) || !manifest.includes('sha512: ' + digest)) {
+    restore(); fail('latest.yml не соответствует установщику.');
+  }
   const sums = path.join(dist, 'SHA256SUMS.txt');
   fs.writeFileSync(sums, assets.map(f => sha256(f) + '  ' + path.basename(f)).join('\n') + '\n');
   ok('сборка: ' + assets.map(f => path.basename(f) + ' (' + (fs.statSync(f).size / 1048576).toFixed(1) + ' МБ)').join(', '));

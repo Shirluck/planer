@@ -275,7 +275,7 @@ function create(ctx) {
   const docs = new Map();         // taskId -> doc
   const loading = new Map();      // taskId -> Promise
   const saveTimers = new Map();
-  const saving = new Set();
+  const saving = new Set(), failedSaves = new Set();
   const histories = new Map();    // taskId -> { undo, redo } (живёт всю сессию)
   const probed = new Set();
   let clip = null;                // внутренний буфер карточек { items, text }
@@ -309,8 +309,8 @@ function create(ctx) {
     const doc = docs.get(taskId); if (!doc) { ctx.pending('board-' + taskId, false); return; }
     const body = JSON.parse(JSON.stringify({ v: 1, view: doc.view, items: doc.items.filter(it => !(it.type === 'link' && !it.url)) }));
     saving.add(taskId);
-    try { await ctx.store.set('board-' + taskId, body); }
-    catch (e) { ctx.saveError(e); }
+    try { await ctx.store.set('board-' + taskId, body); failedSaves.delete(taskId); }
+    catch (e) { failedSaves.add(taskId); ctx.saveError(e); }
     finally {
       saving.delete(taskId);
       if (!saveTimers.has(taskId)) ctx.pending('board-' + taskId, false);
@@ -319,8 +319,9 @@ function create(ctx) {
   }
   async function flush() {
     if (B && B.editingId) syncEditing();
-    await Promise.all([...saveTimers.keys()].map(saveNow));
+    await Promise.all([...new Set([...saveTimers.keys(), ...failedSaves])].map(saveNow));
     for (let i = 0; i < 50 && saving.size; i++) await sleep(20);
+    return !failedSaves.size && !saving.size && !saveTimers.size;
   }
 
   /* ---------- история (отмена/повтор) ---------- */
@@ -2142,6 +2143,7 @@ function create(ctx) {
   // Забыть загруженную доску (после восстановления из копии): следующее открытие прочитает её заново.
   // Возвращает true, если доска была открыта (её закрыли без сохранения поверх восстановленной версии).
   function forget(taskId) {
+    failedSaves.delete(taskId);
     clearTimeout(saveTimers.get(taskId)); saveTimers.delete(taskId);
     docs.delete(taskId); loading.delete(taskId); histories.delete(taskId);
     ctx.pending('board-' + taskId, false);

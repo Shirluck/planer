@@ -428,13 +428,13 @@ function createWindow() {
 // Страница дописывает несохранённое (ответ app:flushed или не дольше 2 секунд).
 function flushPage() {
   return new Promise(resolve => {
-    if (!win || win.isDestroyed() || win.webContents.isCrashed()) { resolve(); return; }
+    if (!win || win.isDestroyed() || win.webContents.isCrashed()) { resolve(false); return; }
     let done = false;
-    const finish = () => { if (done) return; done = true; ipcMain.removeListener('app:flushed', onFlushed); resolve(); };
-    const onFlushed = ev => { if (win && ev.sender === win.webContents) finish(); };
+    const finish = saved => { if (done) return; done = true; ipcMain.removeListener('app:flushed', onFlushed); resolve(saved); };
+    const onFlushed = (ev, saved) => { if (win && ev.sender === win.webContents) finish(saved === true); };
     ipcMain.on('app:flushed', onFlushed);
     win.webContents.send('app:flush');
-    setTimeout(finish, 2000);
+    setTimeout(() => finish(false), 5000);
   });
 }
 
@@ -459,7 +459,34 @@ function hideToTray() {
     }
   }
 }
-function quitFully() { quitting = true; app.quit(); }
+function quitFully() {
+  if (updates && updates.ready()) { void updates.install(false); return; }
+  quitting = true; app.quit();
+}
+let updates = null;
+const portableBuild = !!process.env.PORTABLE_EXECUTABLE_FILE;
+function updateState() {
+  return { available: !!updates, portable: portableBuild, enabled: readSettings().updates !== false, status: updates?.status() };
+}
+ipcMain.handle('update:get', updateState);
+ipcMain.handle('update:action', (ev, action) => {
+  if (!win || ev.sender !== win.webContents || !updates) return;
+  if (typeof action === 'boolean') { writeSettings({ updates: action }); sendToPage('update:state', updateState()); }
+  if (action === 'check') void updates.check();
+  if (action === 'install') void updates.install(true);
+});
+function initUpdates() {
+  if (!app.isPackaged || process.platform !== 'win32' || portableBuild || process.env.PLANER_TEST || process.env.PLANER_SMOKE ||
+      !fs.existsSync(path.join(process.resourcesPath, 'app-update.yml'))) return;
+  updates = require('./lib/updates').createUpdates(require('electron-updater').autoUpdater,
+    () => sendToPage('update:state', updateState()), async () => {
+      if (!await flushPage() || !store.flush()) throw new Error('save');
+      backups.snapshot('manual');
+    }, version => sendToPage('app:command', 'toast', 'Версия ' + version + ' готова. Откройте настройки для установки.'));
+  const tick = () => { if (updateState().enabled) void updates.check(); };
+  setTimeout(tick, 15000).unref();
+  setInterval(tick, 4 * 60 * 60 * 1000).unref();
+}
 /** @param {string} cmd @param {...any} args */
 function pageCommand(cmd, ...args) { showWindow(); sendToPage('app:command', cmd, ...args); }
 
@@ -641,6 +668,7 @@ if (!app.requestSingleInstanceLock()) {
     initStorage();
     applyUi();
     protocol.handle('media', req => media.handleRequest(req));
+    initUpdates();
     buildMenu();
     try { createTray(); } catch (e) { console.error('tray:', e); tray = null; }
     createWindow();

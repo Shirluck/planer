@@ -20,6 +20,10 @@ function initSettings(){
   b.addEventListener('click', () => openSettings());
   ea.ui.onState(applyUiState);
   ea.ui.get().then(applyUiState);
+  if (ea.updates) {
+    const state = s => { SET.updates = s; paintSettings(); };
+    ea.updates.onState(state); ea.updates.get().then(state);
+  }
   if (ea.autostart) { ea.autostart.onState(s => { SET.auto = s; paintSettings(); }); ea.autostart.get().then(s => { SET.auto = s; paintSettings(); }); }
 }
 function applyUiState(s){
@@ -72,6 +76,14 @@ function paintSettings(){
       h('div', { class:'st-row' }, h('span', { class:'st-lab' }, 'Запускать вместе с Windows',
           h('small', {}, 'Планер стартует свёрнутым в трей: таймеры и мини-окно «Сегодня» сразу под рукой.' + (auto.portable ? ' Portable-версия: не перемещайте файл программы, иначе автозапуск его не найдёт.' : ''))),
         sw('Запускать вместе с Windows', auto.enabled, v => ea.autostart.set(v).then(s => { SET.auto = s; paintSettings(); }), 'auto'))) : null,
+    SET.updates?.available ? h('section', { class:'st-sec' },
+      h('h3', {}, 'Обновления'),
+      h('div', { class:'st-row' }, h('span', { class:'st-lab' }, 'Проверять обновления автоматически',
+        h('small', { role:'status' }, SET.updates.status.message)), sw('Проверять обновления автоматически', SET.updates.enabled, v => ea.updates.action(v), 'updates')),
+      h('button', { class:'tb-btn', 'data-f':'update-action', disabled:SET.updates.status.busy,
+        onclick:() => ea.updates.action(SET.updates.status.ready ? 'install' : 'check') },
+        SET.updates.status.ready ? 'Перезапустить и обновить' : 'Проверить обновления')) :
+      SET.updates?.portable ? h('button', { class:'tb-btn', onclick:() => ea.openUrl('https://github.com/Shirluck/planer/releases/latest') }, 'Скачать новую portable-версию') : null,
     ea && ea.backups ? h('section', { class:'st-sec' },
       h('h3', {}, 'Резервные копии'),
       h('p', { class:'st-note' }, 'Каждый день Планер сам копирует все данные и хранит копии за 14 дней. Из копии можно вернуть календарь, планы, идеи или отдельную доску.'),

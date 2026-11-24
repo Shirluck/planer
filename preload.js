@@ -61,7 +61,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   linkPreview: url => ipcRenderer.invoke('link:preview', url),
   notices:  () => ipcRenderer.invoke('app:notices'),
   appInfo:  () => ipcRenderer.invoke('app:info'),
-  onFlush:  cb => { ipcRenderer.on('app:flush', async () => { try { await cb(); } catch (_) {} ipcRenderer.send('app:flushed'); }); },
+  onFlush:  cb => { ipcRenderer.on('app:flush', async () => { let saved = false; try { saved = await cb() === true; } catch (_) {} ipcRenderer.send('app:flushed', saved); }); },
   onStoreError: cb => { ipcRenderer.on('store:error', (_e, m) => cb(String(m || ''))); },
   // команды из меню и трея: 'search', 'timers', 'settings', 'restore', 'task' <id>, 'toast' <текст>
   onCommand: cb => { ipcRenderer.on('app:command', (_e, cmd, arg) => cb(String(cmd || ''), arg)); },
@@ -84,6 +84,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     get:     () => ipcRenderer.invoke('ui:get'),
     set:     patch => ipcRenderer.invoke('ui:set', patch),
     onState: cb => { ipcRenderer.on('ui:state', (_e, s) => cb(s)); }
+  },
+  updates: {
+    get: () => ipcRenderer.invoke('update:get'),
+    action: value => ipcRenderer.invoke('update:action', value),
+    onState: cb => ipcRenderer.on('update:state', (_e, state) => cb(state))
   },
   autostart: {
     get:     () => ipcRenderer.invoke('autostart:get'),
