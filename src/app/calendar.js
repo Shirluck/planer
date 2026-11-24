@@ -8,6 +8,11 @@ function buildTodayCol(){
   const list = h('div', { class:'list', 'data-key':'day' });
   const input = h('input', { class:'add-input', type:'text', placeholder:'Новая задача (!!! — срочно)', title:'Добавьте ! или !! или !!! в конце, чтобы сразу задать приоритет. !!! — срочно', 'aria-label':'Новая задача на сегодня', autocomplete:'off', enterkeyhint:'done' });
   const form = h('form', { class:'composer', onsubmit:e => { e.preventDefault(); addTask(todayKey(), input, list); } }, icon('plus', 16), input);
+  const undatedList = h('div', {class:'list undated-list','aria-label':'Задачи без срока'});
+  const undatedInput = h('input',{class:'add-input',type:'text',placeholder:'Новая задача без срока','aria-label':'Новая задача без срока',autocomplete:'off',enterkeyhint:'done'});
+  const undatedForm = h('form',{class:'composer',onsubmit:e=>{e.preventDefault();addTask(null,undatedInput,undatedList);}},icon('plus',16),undatedInput);
+  const undatedSection = h('section',{class:'day-undated','aria-label':'Без срока'},
+    h('h3',{},'Без срока'),undatedList,undatedForm);
   const eye = tool('eye', 'Скрыть выполненные', () => { S.cal.hideDone = !S.cal.hideDone; touch('cal'); refreshToday(); });
   const clock = tool('clock', 'Добавить блок времени (например, 10:00–12:00)', () => blockEditor(clock, todayKey(), null));
   const more = tool('more', 'Ещё', () => openMenu(more, [
@@ -24,9 +29,10 @@ function buildTodayCol(){
     h('div', { class:'col-head' },
       h('div', { class:'col-title' }, h('span', { class:'ico' }, icon(cfg.icon, 19)), h('h2', {}, cfg.title)),
       h('div', { class:'col-tools' }, clock, eye, more)),
-    sub, h('div', { class:'prog' }, h('div', { class:'bar' }, bar), n), list, form);
+    sub, h('div', { class:'prog' }, h('div', { class:'bar' }, bar), n), list, form, undatedSection);
   bindTaskList(list);
-  return { root, list, sub, bar, n, eye, input };
+  bindTaskList(undatedList);
+  return { root, list, sub, bar, n, eye, input, undatedList };
 }
 function updateProgress(){
   const c = cols.day; if (!c) return;
@@ -53,6 +59,9 @@ function refreshToday(){
   if (!vis.length && !dayBlocks(today).length) c.list.append(h('div', { class:'empty' }, items.length ? 'Все дела на сегодня выполнены' : SECTIONS.day.empty));
   renderTaskGroups(c.list, today, vis);
   c.list.querySelectorAll('textarea').forEach(autosize);
+  c.undatedList.replaceChildren();
+  renderTaskGroups(c.undatedList,null,S.cal.undated.filter(t=>!hide || !t.done));
+  c.undatedList.querySelectorAll('textarea').forEach(autosize);
   paintTsel();
 }
 

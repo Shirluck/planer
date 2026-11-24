@@ -53,7 +53,7 @@ function bindTaskList(list){
     const loc = findTask(el.dataset.id); if (!loc) return; const t = loc.t;
     if (e.target.closest('.cb')) {
       t.done = !t.done; forRows(t.id, r => paintItem(r, t)); touch('cal'); updateProgress(); paintDayProgress(); paintBlockCounts(); refreshWeek();
-      if (t.done && S.cal.hideDone && list === cols.day.list) setTimeout(() => { if (el.isConnected && t.done) refreshToday(); }, 450);
+      if (t.done && S.cal.hideDone && (list === cols.day.list || list === cols.day.undatedList)) setTimeout(() => { if (el.isConnected && t.done) refreshToday(); }, 450);
     } else if (e.target.closest('.pri')) {
       t.pri = (t.pri + 1) % 4; forRows(t.id, r => paintItem(r, t)); touch('cal'); refreshWeek();
     } else if (e.target.closest('.note-btn') || e.target.closest('.note-prev')) {
