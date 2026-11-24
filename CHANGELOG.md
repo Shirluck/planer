@@ -8,6 +8,8 @@
 
 ## [Не выпущено]
 
+## [2.12.0] — 2026-11-24
+
 - Раздел памяти переработан: три упражнения с активным воспроизведением, личные карточки, интервальные повторения и журнал отсроченных ответов.
 
 ## [2.11.0] — 2026-11-24
@@ -121,7 +123,8 @@
   медиа-хранилище, редактор зарисовок, ассистент с инструментами для досок.
 - Установщик и portable-версия для Windows, автотесты.
 
-[Не выпущено]: https://github.com/Shirluck/planer/compare/v2.11.0...HEAD
+[Не выпущено]: https://github.com/Shirluck/planer/compare/v2.12.0...HEAD
+[2.12.0]: https://github.com/Shirluck/planer/compare/v2.11.0...v2.12.0
 [2.11.0]: https://github.com/Shirluck/planer/compare/v2.10.0...v2.11.0
 [2.10.0]: https://github.com/Shirluck/planer/compare/v2.9.0...v2.10.0
 [2.9.0]: https://github.com/Shirluck/planer/compare/v2.8.0...v2.9.0
