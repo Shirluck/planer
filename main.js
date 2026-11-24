@@ -23,7 +23,22 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 const isMac = process.platform === 'darwin';
-const dir = () => app.getPath('userData');
+const dataLocation = require('./lib/data-location').createLocation(app.getPath('userData'));
+const dir = () => dataLocation.state().active;
+ipcMain.handle('location:get', () => dataLocation.state());
+ipcMain.handle('location:pick', async ev => {
+  if (!win || ev.sender !== win.webContents) return;
+  const choice = await dialog.showOpenDialog(win,{title:'Где хранить данные Планера?',properties:['openDirectory','createDirectory']});
+  if (!choice.canceled) {
+    try { dataLocation.choose(choice.filePaths[0]); }
+    catch(err) { return {...dataLocation.state(),error:err.message}; }
+  }
+  return dataLocation.state();
+});
+ipcMain.handle('location:cancel', ev => {
+  if (win && ev.sender === win.webContents) dataLocation.cancel();
+  return dataLocation.state();
+});
 const keyFile = () => path.join(dir(), 'api-key.bin');
 const iconFile = path.join(__dirname, 'build', 'icon.png');
 // На Windows окна и трей берут .ico с готовыми маленькими размерами (16–256 px, подогнаны под пиксели) —
@@ -682,10 +697,17 @@ process.on('unhandledRejection', e => { console.error('unhandled:', e); });
 if (!app.requestSingleInstanceLock()) {
   app.quit();           // второй экземпляр не запускаем: два окна затирали бы данные друг друга
 } else {
-  app.on('second-instance', () => showWindow());
+  app.on('second-instance', () => { if (store) showWindow(); });
   if (process.platform === 'win32') app.setAppUserModelId('local.planer.desktop');
   app.setAboutPanelOptions({ applicationName: 'Планер', applicationVersion: app.getVersion() });
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
+    try {
+      const notice = await dataLocation.start();
+      if (notice) notices.push(notice);
+    } catch(err) {
+      dialog.showErrorBox('Папка данных недоступна',err.message);
+      app.quit(); return;
+    }
     initStorage();
     applyUi();
     protocol.handle('media', req => media.handleRequest(req));

@@ -91,6 +91,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onState: cb => ipcRenderer.on('sync:state', (_e,state) => cb(state)),
     onChanged: cb => ipcRenderer.on('sync:changed', (_e,paths) => cb(paths))
   },
+  location: {
+    get: () => ipcRenderer.invoke('location:get'),
+    pick: () => ipcRenderer.invoke('location:pick'),
+    cancel: () => ipcRenderer.invoke('location:cancel')
+  },
   updates: {
     get: () => ipcRenderer.invoke('update:get'),
     action: value => ipcRenderer.invoke('update:action', value),

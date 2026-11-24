@@ -3,14 +3,14 @@
 'use strict';
 
 /* ---------- tree columns ---------- */
-function buildTreeCol(k){
-  const cfg = SECTIONS[k];
+function buildTreeCol(k, folder=null){
+  const cfg = folder ? {...SECTIONS[k],title:folder.title} : SECTIONS[k];
   const list = h('div', { class:'list tree', 'data-key':k });
   const sub = h('div', { class:'col-sub' });
   const root = h('section', { class:'col', 'data-key':k, 'aria-label':cfg.title },
     h('div', { class:'col-head' },
       h('div', { class:'col-title' }, h('span', { class:'ico' }, icon(cfg.icon, 19)), h('h2', {}, cfg.title)),
-      h('div', { class:'col-tools' }, tool('fileplus', 'Новый файл: текст или доска', e => newFileMenu(e.currentTarget, k, null)), tool('folderplus', 'Новая папка', () => addNode(k, null, 'folder')))),
+      h('div', { class:'col-tools' }, tool('fileplus', 'Новый файл: текст или доска', e => newFileMenu(e.currentTarget, k, folder?.id || null)), tool('folderplus', 'Новая папка', () => addNode(k, folder?.id || null, 'folder')))),
     sub, h('div', { class:'prog', style:'padding-bottom:2px' }), list);
 
   list.addEventListener('click', e => {
@@ -43,7 +43,8 @@ function refreshTree(k, focusId){
   c.sub.textContent = [cnt.text ? cnt.text + ' ' + plural(cnt.text, 'текст', 'текста', 'текстов') : '', cnt.board ? cnt.board + ' ' + plural(cnt.board, 'доска', 'доски', 'досок') : ''].filter(Boolean).join(' · ');
   c.list.replaceChildren();
   if (!nodes.length) c.list.append(h('div', { class:'empty' }, SECTIONS[k].empty));
-  nodes.forEach(n => renderNode(k, n, 0, c.list));
+  nodes.filter(n=>!n.column).forEach(n => renderNode(k, n, 0, c.list));
+  if(k==='plans') paintColumnLayout();
   if (fid) { const r = c.list.querySelector('.node[data-id="' + fid + '"]'); if (r) r.focus({ preventScroll:true }); }
   if (boardApi) { const id = boardApi.openTaskId(); if (id && !findOwner(id)) boardApi.close(); }
 }
@@ -127,7 +128,7 @@ function addNode(k, parentId, type, kind){
   else openPage(k, n.id, { focusTitle:true });
 }
 function startRename(k, id){
-  const row = cols[k].list.querySelector('.node[data-id="' + id + '"]'); const loc = findNode(k, id);
+  const row = board.querySelector('.node[data-id="' + id + '"]'); const loc = findNode(k, id);
   if (!row || !loc) return;
   const t = row.querySelector('.n-title');
   const inp = h('input', { class:'rename', type:'text', 'aria-label':'Название', maxlength:'120' }); inp.value = loc.node.title;

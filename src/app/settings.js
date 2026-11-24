@@ -20,13 +20,14 @@ function initSettings(){
   b.addEventListener('click', () => openSettings());
   ea.ui.onState(applyUiState);
   ea.ui.get().then(applyUiState);
+  if(ea.location) ea.location.get().then(s=>{ SET.location=s; paintSettings(); });
   if (ea.sync) {
     const badge=h('span',{class:'sync-status',role:'status',hidden:true});
     $('#settingsBtn').before(badge);
     const paint = state => {
-      SET.sync = state; badge.hidden=!state.enabled;
+      const first=!SET.sync; SET.sync = state; badge.hidden=!state.enabled;
       badge.textContent=state.text.startsWith('Обе копии')?'ПК ✓':'ПК ↔';
-      badge.title=state.text;badge.setAttribute('aria-label',state.text);paintSettings();
+      badge.title=state.text;badge.setAttribute('aria-label',state.text);if(first || SET.tab==='Синхронизация двух ПК')paintSettings();
     };
     ea.sync.get().then(paint); ea.sync.onState(paint);
     ea.sync.onChanged(paths => applyRestored(paths));
@@ -87,6 +88,15 @@ function paintSettings(){
       h('div', { class:'st-row' }, h('span', { class:'st-lab' }, 'Запускать вместе с Windows',
           h('small', {}, 'Планер стартует свёрнутым в трей: таймеры и мини-окно «Сегодня» сразу под рукой.' + (auto.portable ? ' Portable-версия: не перемещайте файл программы, иначе автозапуск его не найдёт.' : ''))),
         sw('Запускать вместе с Windows', auto.enabled, v => ea.autostart.set(v).then(s => { SET.auto = s; paintSettings(); }), 'auto'))) : null,
+    SET.location ? h('section',{class:'st-sec'},h('h3',{},'Хранение'),
+      h('p',{},'Текущая папка'),h('p',{class:'st-path'},SET.location.active),
+      h('p',{class:'st-note'},'Документы, доски, фото, видео и копии будут храниться в подпапке Planer-Data. Исходная копия сохранится.'),
+      SET.location.pending ? h('p',{class:'st-path'},'При следующем запуске данные будут скопированы в '+SET.location.pending+'. Полностью выйдите через меню трея и снова откройте Планер.') : null,
+      h('button',{class:'tb-btn',onclick:async()=>{
+        try { const r=SET.location.pending ? await ea.location.cancel() : await ea.location.pick();
+          if(r){SET.location=r;paintSettings();if(r.error)toast(r.error);}
+        } catch {toast('Не удалось изменить папку хранения.');}
+      }},SET.location.pending?'Отменить перенос':'Выбрать папку…')) : '',
     SET.sync ? h('section',{class:'st-sec'},h('h3',{},'Синхронизация двух ПК'),
       h('p',{class:'st-note'},'Выберите на обоих компьютерах одну и ту же приватную общую папку Windows с правом записи. Обмен работает и в трее.'),
       h('p',{role:'status'},SET.sync.text),
@@ -98,7 +108,7 @@ function paintSettings(){
       h('button', { class:'tb-btn', 'data-f':'update-action', disabled:SET.updates.status.busy,
         onclick:() => ea.updates.action(SET.updates.status.ready ? 'install' : 'check') },
         SET.updates.status.ready ? 'Перезапустить и обновить' : 'Проверить обновления')) :
-      SET.updates?.portable ? h('button', { class:'tb-btn', onclick:() => ea.openUrl('https://github.com/Shirluck/planer/releases/latest') }, 'Скачать новую portable-версию') : '',
+      SET.updates?.portable ? h('section',{class:'st-sec'},h('h3',{},'Обновления'),h('button', { class:'tb-btn', onclick:() => ea.openUrl('https://github.com/Shirluck/planer/releases/latest') }, 'Скачать новую portable-версию')) : '',
     ea && ea.backups ? h('section', { class:'st-sec' },
       h('h3', {}, 'Резервные копии'),
       h('p', { class:'st-note' }, 'Каждый день Планер сам копирует все данные и хранит копии за 14 дней. Из копии можно вернуть календарь, планы, идеи или отдельную доску.'),
@@ -106,6 +116,17 @@ function paintSettings(){
         h('button', { type:'button', class:'tb-btn', 'data-f':'restore', onclick:() => { closeSettings(); openRestore(); } }, icon('history', 15), 'Восстановить из копии…'),
         h('button', { type:'button', class:'tb-btn', 'data-f':'snap', onclick:() => makeSnapshot() }, 'Сделать копию сейчас'),
         h('button', { type:'button', class:'tb-btn', 'data-f':'folder', onclick:() => ea.backups.openFolder() }, 'Открыть папку с копиями'))) : null);
+  const sections=[...SET.body.querySelectorAll(':scope > section')];
+  const look=sections[0]; look.append(columnControls());
+  const names=sections.map(s=>s.querySelector('h3').textContent);
+  if(!names.includes(SET.tab))SET.tab=names[0];
+  const nav=h('nav',{class:'st-tabs','aria-label':'Разделы настроек'});
+  sections.forEach((s,i)=>{
+    const name=names[i];s.hidden=name!==SET.tab;
+    nav.append(h('button',{type:'button',class:'tb-btn','aria-pressed':String(!s.hidden),onclick:()=>{SET.tab=name;paintSettings();}},name));
+  });
+  SET.body.prepend(nav);
+  for(const node of [...SET.body.childNodes])if(node.nodeType===3)node.remove();
   if (had) { const f = SET.body.querySelector('[data-f="' + had + '"]'); if (f) f.focus(); }
 }
 async function makeSnapshot(){
@@ -251,4 +272,57 @@ async function applyRestored(paths){
     }
   }
   if (paths.some(p => docKey(p) === 'planner-cal') && typeof miniNotify === 'function') miniNotify();
+}
+const layoutPrefs=(()=>{
+  try{return JSON.parse(localStorage.getItem('planer-column-layout'))||{};}catch{return {};}
+})();
+function saveColumnLayout(){
+  localStorage.setItem('planer-column-layout',JSON.stringify(layoutPrefs));
+  paintColumnLayout();paintSettings();
+}
+function paintColumnLayout(){
+  board.querySelectorAll('[data-folder-column]').forEach(el=>el.remove());
+  for(const k of COLS){
+    if(!cols[k])continue;
+    cols[k].root.hidden=!!layoutPrefs[k]?.hidden;
+    const color=layoutPrefs[k]?.color;
+    if(color)document.documentElement.style.setProperty('--c-'+k,color);
+    else document.documentElement.style.removeProperty('--c-'+k);
+  }
+  for(const folder of S.plans.nodes.filter(n=>n.column)){
+    const col=buildTreeCol('plans',folder);
+    col.root.dataset.folderColumn=folder.id;
+    if(layoutPrefs[folder.id]?.color)col.root.style.setProperty('--accent',layoutPrefs[folder.id].color);
+    folder.children.forEach(n=>renderNode('plans',n,0,col.list));
+    board.append(col.root);
+  }
+  const count=board.querySelectorAll('.col:not([hidden])').length;
+  board.style.gridTemplateColumns='repeat('+Math.max(1,count)+',minmax('+ (count>4?'250px':'0') +',1fr))';
+}
+function columnControls(){
+  const section=h('div',{},h('h3',{},'Столбцы'));
+  const folders=S.plans.nodes.filter(n=>n.column);
+  const action=(label,run)=>h('button',{type:'button',class:'tb-btn',onclick:run},label);
+  for(const item of [...COLS.map(k=>({id:k,title:SECTIONS[k].title})),...folders]){
+    const k=item.id,pref=layoutPrefs[k] ||= {};
+    const picker=h('input',{type:'color','aria-label':'Цвет: '+item.title});
+    const token=getComputedStyle(document.documentElement).getPropertyValue('--c-'+(item.column?'plans':k)).trim();
+    picker.value=pref.color||token;
+    picker.onchange=()=>{pref.color=picker.value;saveColumnLayout();};
+    section.append(h('div',{class:'st-row'},h('span',{},item.title),picker,
+      action('Сброс цвета',()=>{delete pref.color;saveColumnLayout();}),
+      action(pref.hidden?'Вернуть':'Убрать',()=>{
+        if(item.column){
+          delete item.column;touch('plans');refreshTree('plans');paintSettings();
+          toast('Содержимое столбца сохранено в папке «Основных планов»',()=>{item.column=true;touch('plans');refreshTree('plans');paintSettings();});
+        }else{pref.hidden=!pref.hidden;saveColumnLayout();}
+      })));
+  }
+  const input=h('input',{placeholder:'Название нового столбца','aria-label':'Название нового столбца',maxlength:80,value:SET.columnDraft||'',oninput:e=>SET.columnDraft=e.target.value});
+  section.append(h('form',{class:'st-row',onsubmit:e=>{
+    e.preventDefault();const title=input.value.trim();if(!title){input.focus();return;}
+    S.plans.nodes.push({id:newId(),type:'folder',title,open:true,column:true,children:[]});
+    SET.columnDraft='';touch('plans');refreshTree('plans');paintSettings();
+  }},input,h('button',{type:'submit',class:'tb-btn'},'Добавить столбец')));
+  return section;
 }

@@ -7,3 +7,4 @@ playwright-report/
 .tmp/
 tests/.fixtures/
 build/icon-preview.png
+/sync/

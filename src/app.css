@@ -49,7 +49,7 @@ textarea,input{font:inherit;color:inherit}
 .bar i{display:block;height:100%;width:0;background:var(--accent);border-radius:9px;transition:width .3s}
 .prog .n{font-size:12px;color:var(--muted);min-width:34px;text-align:right;font-variant-numeric:tabular-nums}
 .list{flex:1;min-height:0;overflow:auto;padding:4px 8px 8px;scrollbar-width:thin}
-.empty{color:var(--muted);text-align:center;padding:28px 18px;font-size:13px}
+.empty:not(.nb){color:var(--muted);text-align:center;padding:28px 18px;font-size:13px}
 
 /* task item */
 .item{position:relative;display:grid;grid-template-columns:14px 22px minmax(0,1fr) auto;column-gap:6px;align-items:start;padding:6px 6px 6px 2px;border-radius:10px}
@@ -620,3 +620,16 @@ body:has(.tsel-bar) .toast{bottom:78px}   /* уведомление не зак�
 .mem-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:16px 0}
 .mem-sequence{font-size:1.4rem;line-height:1.6;overflow-wrap:anywhere}
 .mem-input{padding:8px;margin-right:8px;max-width:65%;font:inherit}
+.board{overflow-x:auto}
+.col[hidden],.st-sec[hidden]{display:none}
+.st-tabs{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:14px}
+.st-tabs [aria-pressed=true]{background:var(--text);color:var(--panel)}
+.ne-extras{display:grid;gap:8px;margin:12px 0}
+.ne-extras:empty{display:none}
+.ne-extras>.tb-btn{text-align:left;justify-self:start}
+.ne-table{overflow-x:auto}
+.ne-table table{border-collapse:collapse;width:100%;margin-bottom:6px}
+.ne-table :is(th,td){border:1px solid var(--line);padding:0}
+.ne-table input{width:100%;min-width:8em;border:0;padding:7px;color:inherit;background:transparent;font:inherit}
+.ne-table th{background:var(--panel-2)}
+.st-path{overflow-wrap:anywhere;user-select:text}

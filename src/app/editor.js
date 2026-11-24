@@ -24,6 +24,8 @@ const BT = {
   quote:   { label:'Цитата',               icon:'quote',   ph:'Цитата',           keys:'цитата quote' },
   callout: { label:'Выноска',              icon:'callout', ph:'Важная мысль',     keys:'выноска важно внимание callout' },
   code:    { label:'Код',                  icon:'code',    ph:'Код',              keys:'код программа экспрешн expression code' },
+  table: {label:'Таблица', icon:'cal', keys:'таблица table'},
+  subpage: {label:'Подстраница',icon:'fileplus',keys:'страница подстраница page'},
   hr:      { label:'Разделитель',          icon:'hr',      ph:'',                 keys:'разделитель линия черта divider hr' }
 };
 const SLASH_TYPES = ['p', 'h1', 'h2', 'h3', 'todo', 'ul', 'ol', 'quote', 'callout', 'code', 'hr'];
@@ -378,7 +380,7 @@ function paintSlash(){
   const S = NE.slash; if (!S) return;
   const si = selInfo();
   const q = window.PlanerCore.normSearch(S.q.trim());
-  S.items = SLASH_TYPES.filter(t => !q || q.split(/\s+/).every(w => window.PlanerCore.normSearch(BT[t].label + ' ' + BT[t].keys).includes(w)));
+  S.items = [...SLASH_TYPES,'table','subpage'].filter(t => !q || q.split(/\s+/).every(w => window.PlanerCore.normSearch(BT[t].label + ' ' + BT[t].keys).includes(w)));
 
   S.i = Math.min(S.i, Math.max(0, S.items.length - 1));
   S.el.replaceChildren(h('div', { class:'ne-slash-cap' }, S.q ? 'Поиск · ' + S.q + (S.items.length ? '' : ' · Нет блоков') : 'Основные блоки · введите название'),
@@ -410,6 +412,8 @@ function chooseSlash(t){
     const r = document.createRange(); r.setStart(p.node, p.off); r.setEnd(q.node, q.off); r.deleteContents();
     syncDom(); NE.last = stateNow();
   }
+  if(t==='table'){neInsertTable();return;}
+  if(t==='subpage'){neInsertPage();return;}
   const b = blockById(S.id); if (!b) return;
   if (!plainOf(el).trim() || b.t === 'hr') setType(b, t);
   else {
@@ -430,7 +434,17 @@ function showBar(si){
   if (!NE.bar) {
     const b = (ic, label, run) => h('button', { type:'button', class:'tool', 'aria-label':label, title:label, onmousedown:e => e.preventDefault(), onclick:run }, icon(ic, 16));
     NE.bar = h('div', { class:'menu ne-bar', role:'toolbar', 'aria-label':'Форматирование' },
-      b('bold', 'Жирный (Ctrl+B)', () => fmt('bold')), b('italic', 'Курсив (Ctrl+I)', () => fmt('italic')),
+      b('olist','Пронумеровать выделенные абзацы', () => {
+        const range=selInfo(); if(!range) return;
+        const before=stateNow(), blocks=blocksOf();
+        const first=blocks.findIndex(b=>b.id===range.a.dataset.id), last=blocks.findIndex(b=>b.id===range.z.dataset.id);
+        for(const b of blocks.slice(first,last+1)){
+          if(b.t==='hr')continue;
+          if(b.t==='code') b.text=mdEscape(b.text);
+          b.t='ol';b.done=false;delete b.emoji;
+        }
+        commit(before,{id:range.a.dataset.id,off:range.ao,zid:range.z.dataset.id,zoff:range.zo});
+      }), b('bold', 'Жирный (Ctrl+B)', () => fmt('bold')), b('italic', 'Курсив (Ctrl+I)', () => fmt('italic')),
       b('underline', 'Подчёркнутый (Ctrl+U)', () => fmt('underline')), b('strike', 'Зачёркнутый (Ctrl+Shift+S)', () => fmt('strikeThrough')),
       b('code', 'Код (Ctrl+E)', () => toggleCode()), b('link', 'Ссылка (Ctrl+K)', () => linkPrompt()),
       h('span', { class:'bd-tsep' }), b('clear', 'Убрать оформление', () => fmt('clear')));
@@ -584,10 +598,15 @@ function openPage(k, id, opts = {}){
       { sep:true },
       { icon:'trash', danger:true, label:'Удалить документ', run:() => deleteNode(editing.k, editing.id) }
     ]); });
-  NE.body = h('div', { class:'sheet-body ne-body' }, titleEl, boxEl, h('div', { class:'pad', onclick:padClick }), NE.gut);
+  const inserts = tool('plus','Добавить таблицу или подстраницу',()=>openMenu(inserts,[
+    {icon:'cal',label:'Таблица',run:()=>neInsertTable()},
+    {icon:'fileplus',label:'Подстраница',run:()=>neInsertPage()}
+  ]));
+  NE.extras=h('div',{class:'ne-extras'});
+  NE.body = h('div', { class:'sheet-body ne-body' }, titleEl, boxEl, NE.extras, h('div', { class:'pad', onclick:padClick }), NE.gut);
   overlayEl = h('div', { class:'overlay', onmousedown:e => { if (e.target === overlayEl) closeEditor(); } },
     h('div', { class:'sheet ne-sheet', 'data-key':k, role:'dialog', 'aria-modal':'true', 'aria-label':'Редактор страницы' },
-      h('div', { class:'sheet-top' }, crumbsEl, h('div', { class:'col-tools' }, outline, more, tool('x', 'Закрыть', () => closeEditor()))),
+      h('div', { class:'sheet-top' }, crumbsEl, h('div', { class:'col-tools' }, inserts, outline, more, tool('x', 'Закрыть', () => closeEditor()))),
       NE.body,
       h('div', { class:'sheet-foot' },
         h('span', {}, h('kbd', {}, '/'), ' — блоки · ', h('kbd', {}, '# '), h('kbd', {}, '- '), h('kbd', {}, '1. '), h('kbd', {}, '[] '), h('kbd', {}, '> '), ' — как в Markdown · ',
@@ -600,8 +619,11 @@ function openPage(k, id, opts = {}){
   if (opts.focusTitle) titleEl.focus();
 }
 function paintCrumbs(){
+  nePaintExtras();
   const loc = editNode() && findNode(editing.k, editing.id); if (!loc) return;
-  crumbsEl.replaceChildren(h('b', {}, SECTIONS[editing.k].title), ...loc.path.flatMap(p => [h('span', {}, '›'), h('span', {}, p.title || 'Без названия')]));
+  const column=loc.path.find(n=>n.column);
+  overlayEl.querySelector('.sheet').style.setProperty('--accent',column && layoutPrefs[column.id]?.color || 'var(--c-'+editing.k+')');
+  crumbsEl.replaceChildren(h('b', {}, SECTIONS[editing.k].title), ...loc.path.flatMap(p => [h('span', {}, '›'), p.type==='page'?h('button',{class:'tb-btn',onclick:()=>openPage(editing.k,p.id)},p.title || 'Без названия'):h('span', {}, p.title || 'Без названия')]));
 }
 function closeEditor(silent){
   if (!overlayEl) return;
@@ -812,4 +834,38 @@ function onPaste(e){
   } else if (right) tail.text = joinMd(tail.text, right);
   if (!b.text && b.t === 'p' && parsed.length && !b.ind && b !== tail) bl.splice(bl.indexOf(b), 1);   // пустая строка, куда вставляли, не нужна
   commit(before, { id:tail.id, off });
+}
+function neInsertPage(){
+  const n=editNode(); if(!n)return;
+  const page={id:newId(),type:'page',kind:'text',title:'',blocks:[newBlock('p')]};
+  (n.children ||= []).push(page);touch(editing.k);
+  openPage(editing.k,page.id,{focusTitle:true});
+}
+function neInsertTable(){
+  const n=editNode(); if(!n)return;
+  (n.tables ||= []).push({id:newId(),columns:['Название','Описание'].map(title=>({id:newId(),title})),rows:[{id:newId(),cells:{}}]});
+  touch(editing.k);nePaintExtras();
+  NE.extras.querySelector('table:last-of-type input')?.focus();
+}
+function nePaintExtras(){
+  const n=editNode();if(!n||!NE.extras)return;
+  const persist=()=>touch(editing.k);
+  const repaint=()=>{persist();nePaintExtras();};
+  const button=(name,fn)=>h('button',{type:'button',class:'tb-btn',onclick:fn},name);
+  const field=(value,label,save)=>{
+    const input=h('input',{'aria-label':label,oninput:e=>{save(e.target.value);persist();}});
+    input.value=value;return input;
+  };
+  NE.extras.replaceChildren();
+  for(const table of n.tables||[]){
+    const grid=h('table',{'aria-label':'Таблица документа'},
+      h('thead',{},h('tr',{},table.columns.map(c=>h('th',{},field(c.title,'Название столбца',v=>c.title=v))))),
+      h('tbody',{},table.rows.map((r,i)=>h('tr',{},table.columns.map(c=>h('td',{},field(r.cells[c.id]||'',(c.title||'Ячейка')+', строка '+(i+1),v=>r.cells[c.id]=v)))))));
+    NE.extras.append(h('section',{class:'ne-table'},grid,
+      button('+ Строка',()=>{table.rows.push({id:newId(),cells:{}});repaint();}),
+      button('+ Столбец',()=>{table.columns.push({id:newId(),title:'Свойство'});repaint();}),
+      button('Убрать таблицу',()=>{const i=n.tables.indexOf(table);n.tables.splice(i,1);const k=editing.k;repaint();
+        toast('Таблица удалена',()=>{n.tables.splice(i,0,table);touch(k);nePaintExtras();});})));
+  }
+  for(const page of n.children||[])NE.extras.append(button('↳ '+(page.title||'Без названия'),()=>openPage(editing.k,page.id)));
 }

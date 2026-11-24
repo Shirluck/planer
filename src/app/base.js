@@ -166,7 +166,7 @@ function findNode(k, id, arr = S[k].nodes, path = []){
   for (let i = 0; i < arr.length; i++) {
     const n = arr[i];
     if (n.id === id) return { k, node:n, arr, index:i, path };
-    if (n.type === 'folder') { const r = findNode(k, id, n.children, [...path, n]); if (r) return r; }
+    if (Array.isArray(n.children)) { const r = findNode(k, id, n.children, [...path, n]); if (r) return r; }
   }
   return null;
 }

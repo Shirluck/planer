@@ -72,9 +72,14 @@
   }
   /** @param {any} n @returns {any} */
   function normNode(n) {
-    if (n && n.type === 'folder') return { id: String(n.id || newId()), type: 'folder', title: String(n.title || ''), open: n.open !== false, children: (n.children || []).map(normNode) };
+    if (n && n.type === 'folder') return { id: String(n.id || newId()), type: 'folder', ...(n.column===true ? {column:true} : {}), title: String(n.title || ''), open: n.open !== false, children: (n.children || []).map(normNode) };
     /** @type {any} */
     const p = { id: String((n && n.id) || newId()), type: 'page', title: String((n && n.title) || ''), blocks: ((n && n.blocks) || []).map(normBlock) };
+    if (Array.isArray(n?.children)) p.children=n.children.map(normNode);
+    if (Array.isArray(n?.tables)) p.tables=n.tables.filter(t=>t && Array.isArray(t.rows) && Array.isArray(t.columns)).map(t=>({
+      id:String(t.id||newId()), columns:t.columns.map(c=>({id:String(c.id),title:String(c.title||'')})),
+      rows:t.rows.map(r=>({id:String(r.id),cells:Object.fromEntries(Object.entries(r.cells||{}).map(([k,v])=>[k,String(v)]))}))
+    }));
     if (n && typeof n.boardId === 'string' && /^[A-Za-z0-9_-]{1,40}$/.test(n.boardId)) p.boardId = n.boardId;   // доска, перенесённая со старой задачи
     if (n && n.boardCount > 0) p.boardCount = n.boardCount | 0;
     const hasText = p.blocks.some(/** @param {any} b */ b => b.text.trim()) || p.blocks.length > 1;
