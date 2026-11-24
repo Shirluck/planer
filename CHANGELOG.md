@@ -8,6 +8,8 @@
 
 ## [Не выпущено]
 
+## [2.8.0] — 2026-11-24
+
 - В настройках хранения можно перенести документы, медиа и резервные копии на другой диск при следующем запуске.
 
 - В редакторе можно нумеровать выделенные абзацы, создавать таблицы и подстраницы. Пустой абзац начинается слева.
@@ -102,7 +104,8 @@
   медиа-хранилище, редактор зарисовок, ассистент с инструментами для досок.
 - Установщик и portable-версия для Windows, автотесты.
 
-[Не выпущено]: https://github.com/Shirluck/planer/compare/v2.7.0...HEAD
+[Не выпущено]: https://github.com/Shirluck/planer/compare/v2.8.0...HEAD
+[2.8.0]: https://github.com/Shirluck/planer/compare/v2.7.0...v2.8.0
 [2.7.0]: https://github.com/Shirluck/planer/compare/v2.6.0...v2.7.0
 [2.6.0]: https://github.com/Shirluck/planer/compare/v2.5.0...v2.6.0
 [2.5.0]: https://github.com/Shirluck/planer/compare/v2.4.0...v2.5.0
