@@ -8,6 +8,8 @@
 
 ## [Не выпущено]
 
+## [2.9.0] — 2026-11-24
+
 - Кнопка создания столбца на главном экране, перестановка столбцов за заголовок с сохранением порядка.
 - Три стиля интерфейса: Clean, «Неон» с выбором цвета подсветки и «Ателье».
 
@@ -107,7 +109,8 @@
   медиа-хранилище, редактор зарисовок, ассистент с инструментами для досок.
 - Установщик и portable-версия для Windows, автотесты.
 
-[Не выпущено]: https://github.com/Shirluck/planer/compare/v2.8.0...HEAD
+[Не выпущено]: https://github.com/Shirluck/planer/compare/v2.9.0...HEAD
+[2.9.0]: https://github.com/Shirluck/planer/compare/v2.8.0...v2.9.0
 [2.8.0]: https://github.com/Shirluck/planer/compare/v2.7.0...v2.8.0
 [2.7.0]: https://github.com/Shirluck/planer/compare/v2.6.0...v2.7.0
 [2.6.0]: https://github.com/Shirluck/planer/compare/v2.5.0...v2.6.0
