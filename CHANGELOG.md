@@ -8,6 +8,8 @@
 
 ## [Не выпущено]
 
+## [2.11.0] — 2026-11-24
+
 - Компактная шапка с меню «Ещё», сворачиваемый список без срока, ручки перестановки столбцов и меню выравнивания карточек.
 
 - Задачи без срока отображаются в первой колонке, без повторения в обзоре недели.
@@ -117,7 +119,8 @@
   медиа-хранилище, редактор зарисовок, ассистент с инструментами для досок.
 - Установщик и portable-версия для Windows, автотесты.
 
-[Не выпущено]: https://github.com/Shirluck/planer/compare/v2.10.0...HEAD
+[Не выпущено]: https://github.com/Shirluck/planer/compare/v2.11.0...HEAD
+[2.11.0]: https://github.com/Shirluck/planer/compare/v2.10.0...v2.11.0
 [2.10.0]: https://github.com/Shirluck/planer/compare/v2.9.0...v2.10.0
 [2.9.0]: https://github.com/Shirluck/planer/compare/v2.8.0...v2.9.0
 [2.8.0]: https://github.com/Shirluck/planer/compare/v2.7.0...v2.8.0
