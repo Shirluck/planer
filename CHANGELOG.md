@@ -8,6 +8,8 @@
 
 ## [Не выпущено]
 
+## [2.7.0] — 2026-11-24
+
 - Двусторонний обмен календарём, страницами, досками и вложениями через приватную общую папку Windows.
 
 - Добавлены локальные игры «Память»: цифры, слова и клетки, десять уровней и рекорды.
@@ -95,7 +97,8 @@
   медиа-хранилище, редактор зарисовок, ассистент с инструментами для досок.
 - Установщик и portable-версия для Windows, автотесты.
 
-[Не выпущено]: https://github.com/Shirluck/planer/compare/v2.6.0...HEAD
+[Не выпущено]: https://github.com/Shirluck/planer/compare/v2.7.0...HEAD
+[2.7.0]: https://github.com/Shirluck/planer/compare/v2.6.0...v2.7.0
 [2.6.0]: https://github.com/Shirluck/planer/compare/v2.5.0...v2.6.0
 [2.5.0]: https://github.com/Shirluck/planer/compare/v2.4.0...v2.5.0
 [2.4.0]: https://github.com/Shirluck/planer/compare/v2.3.0...v2.4.0
