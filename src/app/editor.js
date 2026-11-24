@@ -379,11 +379,11 @@ function paintSlash(){
   const si = selInfo();
   const q = window.PlanerCore.normSearch(S.q.trim());
   S.items = SLASH_TYPES.filter(t => !q || q.split(/\s+/).every(w => window.PlanerCore.normSearch(BT[t].label + ' ' + BT[t].keys).includes(w)));
-  if (!S.items.length && S.q.length > 2) { closeSlash(); return; }
+
   S.i = Math.min(S.i, Math.max(0, S.items.length - 1));
-  S.el.replaceChildren(h('div', { class:'ne-slash-cap' }, S.items.length ? 'Блоки' : 'Ничего не найдено'),
+  S.el.replaceChildren(h('div', { class:'ne-slash-cap' }, S.q ? 'Поиск · ' + S.q + (S.items.length ? '' : ' · Нет блоков') : 'Основные блоки · введите название'),
     ...S.items.map((t, i) => h('button', { type:'button', class:'menu-it' + (i === S.i ? ' on' : ''), role:'option', 'aria-selected':String(i === S.i), 'data-t':t,
-      onmousedown:e => e.preventDefault(), onclick:() => chooseSlash(t) }, icon(BT[t].icon, 16), BT[t].label)));
+      onmousedown:e => e.preventDefault(), onclick:() => chooseSlash(t) }, icon(BT[t].icon, 16), BT[t].label, h('kbd', { class:'ne-keyhint' }, ({h1:'#',h2:'##',h3:'###',ul:'-',ol:'1.',todo:'[]',quote:'>',hr:'---'})[t] || ''))));
   if (!S.el.isConnected) placeNear(S.el, si ? caretRect(si) : boxEl.getBoundingClientRect(), false);
   const on = S.el.querySelector('.on'); if (on) on.scrollIntoView({ block:'nearest' });
 }
@@ -568,6 +568,13 @@ function openPage(k, id, opts = {}){
   NE.gut = h('div', { class:'ne-gut', hidden:true },
     h('button', { type:'button', class:'ne-gb', title:'Новый блок ниже', 'aria-label':'Новый блок ниже', onmousedown:e => e.preventDefault(), onclick:() => plusBlock() }, icon('plus', 16)),
     h('button', { type:'button', class:'ne-gb ne-grip', title:'Перетащите, чтобы переместить; щелчок — меню блока', 'aria-label':'Блок: переместить или изменить', onpointerdown:startBlockDrag }, icon('grip', 15)));
+  const outline = tool('olist', 'Оглавление страницы', () => {
+    const headings = [...boxEl.querySelectorAll('.nb')].filter(el => /^h[123]$/.test(el.dataset.t));
+    if (!headings.length) { toast('Добавьте заголовок через /, чтобы он появился в оглавлении'); return; }
+    openMenu(outline, headings.map(el => ({ icon:el.dataset.t, label:plainOf(el) || 'Без названия', run:() => {
+      boxEl.focus(); setCaret(el.dataset.id, 0); el.scrollIntoView({ block:'center' });
+    }})));
+  });
   const more = tool('more', 'Действия со страницей', () => { const nn = editNode(); if (!nn) return; const other = editing.k === 'plans' ? 'ideas' : 'plans';
     openMenu(more, [
       { icon:'copy', label:'Копировать как Markdown', run:() => copyMarkdown() },
@@ -580,7 +587,7 @@ function openPage(k, id, opts = {}){
   NE.body = h('div', { class:'sheet-body ne-body' }, titleEl, boxEl, h('div', { class:'pad', onclick:padClick }), NE.gut);
   overlayEl = h('div', { class:'overlay', onmousedown:e => { if (e.target === overlayEl) closeEditor(); } },
     h('div', { class:'sheet ne-sheet', 'data-key':k, role:'dialog', 'aria-modal':'true', 'aria-label':'Редактор страницы' },
-      h('div', { class:'sheet-top' }, crumbsEl, h('div', { class:'col-tools' }, more, tool('x', 'Закрыть', () => closeEditor()))),
+      h('div', { class:'sheet-top' }, crumbsEl, h('div', { class:'col-tools' }, outline, more, tool('x', 'Закрыть', () => closeEditor()))),
       NE.body,
       h('div', { class:'sheet-foot' },
         h('span', {}, h('kbd', {}, '/'), ' — блоки · ', h('kbd', {}, '# '), h('kbd', {}, '- '), h('kbd', {}, '1. '), h('kbd', {}, '[] '), h('kbd', {}, '> '), ' — как в Markdown · ',

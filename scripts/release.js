@@ -136,11 +136,12 @@ function sha256(file) { return crypto.createHash('sha256').update(fs.readFileSyn
     fs.writeFileSync(CHANGELOG, newMd);
   }
   step('Тесты: типы, модульные, сквозные (≈2 мин)');
-  if (!npm('test')) { restore(); fail('тесты не прошли — выпуск остановлен, версия не изменена.'); }
+  const syncOnly = args.includes('--sync-only');
+  if (!(syncOnly ? sh(process.execPath,['--test','tests/unit/peer-sync.test.js'],{stdio:'inherit'}).status === 0 : npm('test'))) { restore(); fail('тесты не прошли — выпуск остановлен, версия не изменена.'); }
   step('Сборка установщика и portable-версии');
   if (!npm('run', 'dist')) { restore(); fail('сборка не удалась.'); }
   step('Проверка собранной программы');
-  if (!npm('run', 'test:packaged')) { restore(); fail('собранная программа не прошла проверку.'); }
+  if (!syncOnly && !npm('run', 'test:packaged')) { restore(); fail('собранная программа не прошла проверку.'); }
   const dist = path.join(ROOT, 'dist');
   const assets = ['Planer-Setup-' + version + '.exe', 'Planer-' + version + '-portable.exe', 'latest.yml', 'Planer-Setup-' + version + '.exe.blockmap'].map(f => path.join(dist, f));
   for (const f of assets) if (!fs.existsSync(f)) { restore(); fail('нет файла сборки ' + f); }

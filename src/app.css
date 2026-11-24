@@ -612,3 +612,11 @@ body:has(.tsel-bar) .toast{bottom:78px}   /* уведомление не зак�
   .sheet{height:100%;border-radius:0;width:100%}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.ne-keyhint{margin-left:auto;color:var(--muted)}
+.memory-dialog{width:min(480px,94vw);color:var(--text);background:var(--panel);border:0;padding:0}
+.memory-dialog::backdrop{background:#0006}
+.memory-dialog .st-body{padding:20px}
+.memory-dialog [aria-pressed=true]{background:var(--p1);color:var(--panel);opacity:1}
+.mem-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:16px 0}
+.mem-sequence{font-size:1.4rem;line-height:1.6;overflow-wrap:anywhere}
+.mem-input{padding:8px;margin-right:8px;max-width:65%;font:inherit}

@@ -85,6 +85,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     set:     patch => ipcRenderer.invoke('ui:set', patch),
     onState: cb => { ipcRenderer.on('ui:state', (_e, s) => cb(s)); }
   },
+  sync: {
+    get: () => ipcRenderer.invoke('sync:get'),
+    setup: enable => ipcRenderer.invoke('sync:setup',enable),
+    onState: cb => ipcRenderer.on('sync:state', (_e,state) => cb(state)),
+    onChanged: cb => ipcRenderer.on('sync:changed', (_e,paths) => cb(paths))
+  },
   updates: {
     get: () => ipcRenderer.invoke('update:get'),
     action: value => ipcRenderer.invoke('update:action', value),

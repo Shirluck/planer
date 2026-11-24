@@ -66,6 +66,11 @@ function initStorage() {
     onChange: st => { broadcast('timer:state', st); updateTray(true); },
     onDone: timerDone
   });
+  peerSync = require('./lib/peer-sync').createSync({ dir:dir(), store, media, backups, flush:flushPage,
+    changed:paths => { if(paths.includes(TIMERS_DOC)) timers.reload(); sendToPage('sync:changed', paths); },
+    activity:state => sendToPage('sync:state',state)
+  });
+  setInterval(() => { if(win && !win.isDestroyed()) void peerSync.tick(); }, 15000).unref();
   store.dailyBackup();
 }
 
@@ -384,6 +389,22 @@ ipcMain.handle('anthropic', async (_e, rid, body) => {
 ipcMain.handle('anthropic:cancel', (_e, rid) => { const c = inflight.get(rid); if (c) c.abort(); return true; });
 
 /* ---------- окно и меню ---------- */
+let peerSync = null;
+ipcMain.handle('sync:get', () => peerSync.state());
+ipcMain.handle('sync:setup', async (e, enable) => {
+  if (!win || e.sender !== win.webContents || typeof enable !== 'boolean') return;
+  try {
+    let root = '';
+    if (enable) {
+      const choice = await dialog.showOpenDialog(win,{title:'Выберите общую папку двух ПК',properties:['openDirectory']});
+      if (choice.canceled) return;
+      root = choice.filePaths[0];
+      if(!await flushPage()) throw Error('Не удалось сохранить все изменения');
+    }
+    peerSync.setup(root);
+    if(enable) void peerSync.tick();
+  } catch(err) { sendToPage('app:command','toast',err.message); }
+});
 let quitting = false;
 const webPrefs = () => ({ preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true, spellcheck: false,
   autoplayPolicy: /** @type {'no-user-gesture-required'} */ ('no-user-gesture-required') });   // звук таймера, даже когда окно в трее

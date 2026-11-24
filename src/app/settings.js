@@ -20,6 +20,17 @@ function initSettings(){
   b.addEventListener('click', () => openSettings());
   ea.ui.onState(applyUiState);
   ea.ui.get().then(applyUiState);
+  if (ea.sync) {
+    const badge=h('span',{class:'sync-status',role:'status',hidden:true});
+    $('#settingsBtn').before(badge);
+    const paint = state => {
+      SET.sync = state; badge.hidden=!state.enabled;
+      badge.textContent=state.text.startsWith('Обе копии')?'ПК ✓':'ПК ↔';
+      badge.title=state.text;badge.setAttribute('aria-label',state.text);paintSettings();
+    };
+    ea.sync.get().then(paint); ea.sync.onState(paint);
+    ea.sync.onChanged(paths => applyRestored(paths));
+  }
   if (ea.updates) {
     const state = s => { SET.updates = s; paintSettings(); };
     ea.updates.onState(state); ea.updates.get().then(state);
@@ -76,6 +87,10 @@ function paintSettings(){
       h('div', { class:'st-row' }, h('span', { class:'st-lab' }, 'Запускать вместе с Windows',
           h('small', {}, 'Планер стартует свёрнутым в трей: таймеры и мини-окно «Сегодня» сразу под рукой.' + (auto.portable ? ' Portable-версия: не перемещайте файл программы, иначе автозапуск его не найдёт.' : ''))),
         sw('Запускать вместе с Windows', auto.enabled, v => ea.autostart.set(v).then(s => { SET.auto = s; paintSettings(); }), 'auto'))) : null,
+    SET.sync ? h('section',{class:'st-sec'},h('h3',{},'Синхронизация двух ПК'),
+      h('p',{class:'st-note'},'Выберите на обоих компьютерах одну и ту же приватную общую папку Windows с правом записи. Обмен работает и в трее.'),
+      h('p',{role:'status'},SET.sync.text),
+      h('button',{class:'tb-btn',disabled:SET.sync.busy,onclick:()=>ea.sync.setup(!SET.sync.enabled)},SET.sync.enabled?'Отключить обмен':'Выбрать общую папку…')) : '',
     SET.updates?.available ? h('section', { class:'st-sec' },
       h('h3', {}, 'Обновления'),
       h('div', { class:'st-row' }, h('span', { class:'st-lab' }, 'Проверять обновления автоматически',
