@@ -8,6 +8,8 @@
 
 ## [Не выпущено]
 
+## [2.10.0] — 2026-11-24
+
 - В первой колонке появился отдельный список «Без срока» с собственным полем добавления.
 
 ## [2.9.0] — 2026-11-24
@@ -111,7 +113,8 @@
   медиа-хранилище, редактор зарисовок, ассистент с инструментами для досок.
 - Установщик и portable-версия для Windows, автотесты.
 
-[Не выпущено]: https://github.com/Shirluck/planer/compare/v2.9.0...HEAD
+[Не выпущено]: https://github.com/Shirluck/planer/compare/v2.10.0...HEAD
+[2.10.0]: https://github.com/Shirluck/planer/compare/v2.9.0...v2.10.0
 [2.9.0]: https://github.com/Shirluck/planer/compare/v2.8.0...v2.9.0
 [2.8.0]: https://github.com/Shirluck/planer/compare/v2.7.0...v2.8.0
 [2.7.0]: https://github.com/Shirluck/planer/compare/v2.6.0...v2.7.0
