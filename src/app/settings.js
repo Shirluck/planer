@@ -137,7 +137,7 @@ async function loadRestoreList(keep){
       h('b', {}, rsWhen(b)), h('span', { class:'rs-kind k-' + b.kind }, RS_KIND[b.kind]), h('span', { class:'rs-n' }, b.docs.length + ' ' + plural(b.docs.length, 'документ', 'документа', 'документов'))))
     : [h('div', { class:'rs-empty' }, 'Копий пока нет. Первая появится сегодня или нажмите «Сделать копию сейчас».')]));
   const pick = items.find(b => b.id === keep) || items[0];
-  if (pick) selectBackup(pick.id); else RS.docs.replaceChildren();
+  if (pick) await selectBackup(pick.id); else RS.docs.replaceChildren();
 }
 async function rsRead(id, p){
   const k = id + '|' + p;
@@ -201,13 +201,17 @@ async function doRestore(id, paths){
   if (!r || !r.ok) { toast('Не удалось восстановить: ' + ((r && r.error) || 'ошибка')); if (RS.dlg) selectBackup(id); return; }
   await applyRestored(paths);
   const what = paths.length === 1 ? 'документ' : paths.length + ' ' + plural(paths.length, 'документ', 'документа', 'документов');
+  if (RS.dlg) await loadRestoreList(id);
   toast('Восстановлено: ' + what + '. Прежняя версия сохранена в копию.', async () => {
     await flushEverything();
     const u = await ea.backups.restore(r.undoId, paths);
-    if (u && u.ok) { await applyRestored(paths); toast('Восстановление отменено'); } else toast('Не удалось отменить: ' + ((u && u.error) || 'ошибка'));
-    if (RS.dlg) loadRestoreList(RS.sel);
+    if (u && u.ok) {
+      await applyRestored(paths);
+      if (RS.dlg) await loadRestoreList(RS.sel);
+      toast('Восстановление отменено');
+    } else toast('Не удалось отменить: ' + ((u && u.error) || 'ошибка'));
   });
-  if (RS.dlg) { loadRestoreList(id); const f = RS.list.querySelector('.rs-item[aria-selected=true]') || RS.list; f.focus(); }   // открытая заново доска не уводит фокус из окна
+  if (RS.dlg) { const f = RS.list.querySelector('.rs-item[aria-selected=true]') || RS.list; f.focus(); }   // открытая заново доска не уводит фокус из окна
 }
 // Восстановленные документы перечитываются в открытое приложение — без перезапуска.
 async function applyRestored(paths){
