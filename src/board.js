@@ -949,11 +949,18 @@ function create(ctx) {
       if (it.type === 'image') bar.append(btn('eye', 'Открыть просмотр', () => openViewer(it)));
     }
     if (items.length >= 2) {
-      bar.append(btn('alL', 'Выровнять по левому краю', () => alignSel('left')), btn('alC', 'По центру по горизонтали', () => alignSel('hcenter')),
-        btn('alR', 'По правому краю', () => alignSel('right')), btn('alT', 'По верхнему краю', () => alignSel('top')),
-        btn('alM', 'По центру по вертикали', () => alignSel('vcenter')), btn('alB', 'По нижнему краю', () => alignSel('bottom')));
-      if (items.length >= 3) bar.append(btn('disH', 'Распределить по горизонтали — равные промежутки', () => distributeSel('h')), btn('disV', 'Распределить по вертикали — равные промежутки', () => distributeSel('v')));
-      bar.append(btn('tidy', 'Разложить аккуратной сеткой', () => tidySel()), h('span', { class: 'bd-tsep' }));
+      const actions = [
+        ['alL','Выровнять по левому краю','left'],['alC','По центру по горизонтали','hcenter'],
+        ['alR','По правому краю','right'],['alT','По верхнему краю','top'],
+        ['alM','По центру по вертикали','vcenter'],['alB','По нижнему краю','bottom']
+      ].map(([icon,label,kind])=>({icon,label,run:()=>alignSel(kind)}));
+      if(items.length>=3) actions.push(
+        {icon:'disH',label:'Распределить по горизонтали',run:()=>distributeSel('h')},
+        {icon:'disV',label:'Распределить по вертикали',run:()=>distributeSel('v')});
+      actions.push({icon:'tidy',label:'Разложить аккуратной сеткой',run:tidySel});
+      const align=btn('alL','Выровнять',()=>ctx.openMenu(align,actions));
+      align.append('Выровнять ▾');align.classList.add('bd-align');align.setAttribute('aria-haspopup','true');
+      bar.append(align,h('span',{class:'bd-tsep'}));
     }
     bar.append(btn('front', 'На передний план', () => toFront()), btn('back', 'На задний план', () => toBack()),
       btn('dup', 'Дублировать (Ctrl+D)', () => duplicate()), btn('trash', 'Удалить (Delete)', () => deleteSel()));

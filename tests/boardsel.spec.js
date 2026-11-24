@@ -32,16 +32,20 @@ test('выделение рамкой, рука, выравнивание, ра�
     await page.locator('.bd-card', { hasText: 'Б' }).click({ modifiers: ['Control'] });
     await expect(page.locator('.bd-card.sel')).toHaveCount(3);
     // выравнивание по верхнему краю, распределение по горизонтали
-    await page.click('.bd-ctx .tool[aria-label="По верхнему краю"]');
+    await page.getByRole('button',{name:'Выровнять',exact:true}).click();
+    await page.locator('.menu-it').getByText('По верхнему краю',{exact:true}).click();
     let d = await waitBoard(page, id, d => d.items.every(i => i.y === 0));
-    await page.click('.bd-ctx .tool[aria-label^="Распределить по горизонтали"]');
+    await page.getByRole('button',{name:'Выровнять',exact:true}).click();
+    await page.locator('.menu-it').getByText('Распределить по горизонтали',{exact:true}).click();
     d = await waitBoard(page, id, d => { const xs = d.items.map(i => i.x).sort((p, q) => p - q); return xs[1] === 320; });
     expect(d.items.map(i => i.x).sort((p, q) => p - q)).toEqual([0, 320, 640]);        // ширина 240 → промежутки по 80
-    await page.click('.bd-ctx .tool[aria-label="Выровнять по левому краю"]');
+    await page.getByRole('button',{name:'Выровнять',exact:true}).click();
+    await page.locator('.menu-it').getByText('Выровнять по левому краю',{exact:true}).click();
     await waitBoard(page, id, d => d.items.every(i => i.x === 0));
     await page.keyboard.press('Control+z');
     await waitBoard(page, id, d => d.items.some(i => i.x === 640));
-    await page.click('.bd-ctx .tool[aria-label="Разложить аккуратной сеткой"]');
+    await page.getByRole('button',{name:'Выровнять',exact:true}).click();
+    await page.locator('.menu-it').getByText('Разложить аккуратной сеткой',{exact:true}).click();
     await waitBoard(page, id, d => new Set(d.items.map(i => i.y)).size >= 1);
     // притяжение: тянем «Б» вниз почти к нижнему краю «А» — встаёт ровно и видна направляющая
     const cards = await page.evaluate(k => boardApi.readBoard(k), id);

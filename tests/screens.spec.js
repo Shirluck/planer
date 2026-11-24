@@ -224,6 +224,7 @@ test.describe.serial('Скриншоты', () => {
     await page.click('#settingsBtn');
     await shot('settings-light');
     await scheme('dark'); await shot('settings-dark'); await scheme('light');
+    await page.locator('.st-tabs').getByText('Резервные копии',{exact:true}).click();
     await page.locator('.st-btns button', { hasText: 'Сделать копию сейчас' }).click();
     await page.locator('.st-btns button', { hasText: 'Восстановить из копии' }).click();
     await expect(page.locator('.rs-doc').first()).toBeVisible();

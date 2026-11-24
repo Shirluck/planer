@@ -11,8 +11,13 @@ function buildTodayCol(){
   const undatedList = h('div', {class:'list undated-list','aria-label':'Задачи без срока'});
   const undatedInput = h('input',{class:'add-input',type:'text',placeholder:'Новая задача без срока','aria-label':'Новая задача без срока',autocomplete:'off',enterkeyhint:'done'});
   const undatedForm = h('form',{class:'composer',onsubmit:e=>{e.preventDefault();addTask(null,undatedInput,undatedList);}},icon('plus',16),undatedInput);
+  const toggle=h('button',{type:'button',class:'undated-toggle','aria-controls':'undated-list',onclick:()=>{
+    localStorage.setItem('planer-undated-folded',String(toggle.getAttribute('aria-expanded')==='true'));
+    refreshToday();
+  }},'Без срока');
+  undatedList.id='undated-list';
   const undatedSection = h('section',{class:'day-undated','aria-label':'Без срока'},
-    h('h3',{},'Без срока'),undatedList,undatedForm);
+    h('h3',{},toggle),undatedList,undatedForm);
   const eye = tool('eye', 'Скрыть выполненные', () => { S.cal.hideDone = !S.cal.hideDone; touch('cal'); refreshToday(); });
   const clock = tool('clock', 'Добавить блок времени (например, 10:00–12:00)', () => blockEditor(clock, todayKey(), null));
   const more = tool('more', 'Ещё', () => openMenu(more, [
@@ -32,7 +37,7 @@ function buildTodayCol(){
     sub, h('div', { class:'prog' }, h('div', { class:'bar' }, bar), n), list, form, undatedSection);
   bindTaskList(list);
   bindTaskList(undatedList);
-  return { root, list, sub, bar, n, eye, input, undatedList };
+  return { root, list, sub, bar, n, eye, input, undatedList, undatedSection, toggle };
 }
 function updateProgress(){
   const c = cols.day; if (!c) return;
@@ -60,7 +65,14 @@ function refreshToday(){
   renderTaskGroups(c.list, today, vis);
   c.list.querySelectorAll('textarea').forEach(autosize);
   c.undatedList.replaceChildren();
-  renderTaskGroups(c.undatedList,null,S.cal.undated.filter(t=>!hide || !t.done));
+  const backlog=S.cal.undated.filter(t=>!hide || !t.done);
+  const folded=backlog.length>0 && localStorage.getItem('planer-undated-folded')==='true';
+  c.toggle.disabled=!backlog.length;
+  c.toggle.textContent='Без срока'+(backlog.length?' · '+backlog.length:'');
+  c.toggle.setAttribute('aria-expanded',String(!folded));
+  c.undatedList.hidden=folded;
+  c.undatedSection.classList.toggle('folded',folded);
+  renderTaskGroups(c.undatedList,null,backlog);
   c.undatedList.querySelectorAll('textarea').forEach(autosize);
   paintTsel();
 }
@@ -144,7 +156,6 @@ function refreshWeek(){
     h('button', { class:'mc-nav', type:'button', 'aria-label':'Следующая неделя', title:'Следующая неделя', onclick:nav(1) }, icon('chev', 15))));
   let shown = 0;
   days.forEach(k => { const r = weekDayEl(k); shown += r.shown; c.list.append(r.el); });
-  if (st.undated.length) c.list.append(weekDayEl(null).el);
   if (!shown) c.list.append(h('div', { class:'wk-hint' }, st.urgentOnly
     ? 'Срочных задач на этой неделе нет. Нажмите на день, чтобы расписать его; задача с !!! в конце — срочная и появится здесь.'
     : 'На этой неделе задач нет. Нажмите на день, чтобы расписать его.'));

@@ -50,9 +50,9 @@ function openTools(tab){
     onclick:() => { MT.tab = id; mtSavePrefs(); tabs.querySelectorAll('.mt-tab').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === id))); renderToolsTab(); } }, icon(ic, 15), label)));
   MT.pop = h('div', { class:'menu mt-pop', role:'dialog', 'aria-label':'Инструменты моушн-дизайнера' },
     h('div', { class:'tm-head' }, icon('film', 17), h('b', {}, 'Моушн'), h('span', { class:'tm-sub' }, 'инструменты для работы')), tabs, MT.body);
-  MT.pop.addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeMenu(); MT.btn.focus(); } });
+  MT.pop.addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeMenu(); (MT.btn.offsetWidth ? MT.btn : headerMore).focus(); } });
   renderToolsTab();
-  menuEl = MT.pop; placePopup(MT.btn, MT.pop);
+  menuEl = MT.pop; placePopup(MT.btn.offsetWidth ? MT.btn : headerMore, MT.pop);
 }
 function renderToolsTab(){
   const t = MT.tab;

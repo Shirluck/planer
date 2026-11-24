@@ -58,9 +58,9 @@ function openTimers(){
   TM.pop = h('div', { class:'menu tm-pop', role:'dialog', 'aria-label':'Таймеры' },
     h('div', { class:'tm-head' }, icon('timer', 17), h('b', {}, 'Таймеры'), h('span', { class:'tm-sub' }, 'для фокусировки и перерывов')),
     TM.run, h('div', { class:'tm-cap' }, 'Мои таймеры'), TM.list, TM.form, soundBox);
-  TM.pop.addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeMenu(); TM.btn.focus(); } });
+  TM.pop.addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeMenu(); (TM.btn.offsetWidth ? TM.btn : headerMore).focus(); } });
   renderTimerLists(); renderTimerForm(); renderSoundBox(soundBox);
-  menuEl = TM.pop; placePopup(TM.btn, TM.pop);
+  menuEl = TM.pop; placePopup(TM.btn.offsetWidth ? TM.btn : headerMore, TM.pop);
   const first = TM.pop.querySelector('.tm-start'); if (first) first.focus();
 }
 function renderTimerLists(){

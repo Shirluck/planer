@@ -36,10 +36,10 @@ async function closeApp(app) { if (app) { try { await app.close(); } catch (_) {
 // Задача на сегодня (колонка «Сегодня») или в открытом окне дня (k = 'sheet').
 async function addTask(page, k, text) {
   const scope = k === 'sheet' ? '.day-sheet' : '.col[data-key=' + k + ']';
-  const inp = page.locator(scope + ' .add-input');
+  const inp = (k === 'day' ? page.getByRole('textbox',{name:'Новая задача на сегодня',exact:true}) : page.locator(scope + ' .add-input'));
   await inp.fill(text);
   await inp.press('Enter');
-  const item = page.locator(scope + ' .item', { has: page.locator('textarea.txt') }).last();
+  const item = page.locator(scope + (k === 'day' ? ' > .list .item' : ' .item'), { has: page.locator('textarea.txt') }).last();
   await expect(item).toBeVisible();
   return item.getAttribute('data-id');
 }

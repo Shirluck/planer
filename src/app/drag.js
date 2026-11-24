@@ -78,7 +78,7 @@ function dragOverTask(x, y){
     return;
   }
   if (it && own(it)) return;                                               // над собой — без изменений
-  let zone = el.closest('.tz') || (el.closest('.tblock') && el.closest('.tblock').querySelector('.tz'));
+  let zone = el.closest('.day-undated')?.querySelector('.tz') || el.closest('.tz') || (el.closest('.tblock') && el.closest('.tblock').querySelector('.tz'));
   if (!zone && list && list.querySelector('.tz') && !el.closest('.wk-day')) { const zs = list.querySelectorAll('.tz'); zone = zs[zs.length - 1]; }
   if (zone) { zone.classList.add('drop-end'); d.target = Object.assign(zoneTarget(zone), { beforeId:null }); return; }
   const wd = el.closest('.wk-day');

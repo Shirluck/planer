@@ -14,6 +14,7 @@ test('восстановление календаря и доски из коп�
     await waitBoard(page, boardId, d => d.items.length === 1);
     // копия вручную из настроек
     await page.click('#settingsBtn');
+    await page.locator('.st-tabs').getByText('Резервные копии',{exact:true}).click();
     await page.locator('.st-btns button', { hasText: 'Сделать копию сейчас' }).click();
     await expect(page.locator('.toast')).toContainText('Копия данных сделана');
     await page.keyboard.press('Escape');

@@ -21,12 +21,13 @@ test('миграция старого planner-data.json без потерь и �
   const { app, page, errors } = await launch(dir);
   try {
     // «Сегодня» версии 1 → задачи на сегодняшнюю дату
-    await expect(page.locator('.col[data-key=day] .item')).toHaveCount(2);
+    await expect(page.locator('.col[data-key=day] > .list .item')).toHaveCount(2);
     await expect(page.locator('.col[data-key=day] .item').first().locator('.txt')).toHaveValue('Старая задача');
     await expect(page.locator('.col[data-key=day] .item').first()).toHaveAttribute('data-pri', '3');
     await expect(page.locator('.col[data-key=day] .note-prev').first()).toHaveText('заметка из v1');
     // «Неделя» версии 1 → «Без даты» в календаре
-    await expect(page.locator('.col[data-key=week] .wk-day.undated .wk-task .wk-t')).toHaveText('Задача недели');
+    await expect(page.locator('.undated-list .txt')).toHaveValue('Задача недели');
+    await expect(page.locator('.wk-day.undated')).toHaveCount(0);
     await expect(page.locator('.col[data-key=plans] .node.page .n-title', { hasText: 'План' })).toBeVisible();
     // доска старой задачи → страница в «Основных планах» → «Доски задач», карточки на месте
     const pg = page.locator('.col[data-key=plans] .node.page', { hasText: 'Старая задача' });
@@ -47,7 +48,7 @@ test('миграция старого planner-data.json без потерь и �
   // после миграции изменения пишутся в planner-cal и не теряются; повторной миграции нет
   const r2 = await launch(dir);
   try {
-    await expect(r2.page.locator('.col[data-key=day] .item')).toHaveCount(2);
+    await expect(r2.page.locator('.col[data-key=day] > .list .item')).toHaveCount(2);
     await expect(r2.page.locator('.col[data-key=plans] .node.page', { hasText: 'Старая задача' })).toHaveCount(1);
     await r2.page.locator('.col[data-key=day] .item').first().locator('.cb').click();
     await expect(r2.page.locator('#status')).toHaveText('Сохранено');

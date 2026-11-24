@@ -344,6 +344,13 @@ function openColumnComposer(){
   document.body.append(dialog);dialog.onclose=()=>{dialog.remove();$('#addColumnBtn').focus();};dialog.showModal();input.focus();
 }
 $('#addColumnBtn').onclick=openColumnComposer;
+const headerMore=$('#headerMore');
+headerMore.onclick=()=>openMenu(headerMore,[
+  {icon:'timer',label:'Таймеры',run:()=>openTimers()},
+  {icon:'film',label:'Моушн',run:()=>openTools()},
+  {icon:'bulb',label:'Память',run:()=>$('#memoryBtn').click()},
+  {icon:'plus',label:'Добавить столбец',run:openColumnComposer}
+]);
 (() => {
   let source=null,target=null;
   const key=el=>el.dataset.folderColumn||el.dataset.key;

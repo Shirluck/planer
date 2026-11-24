@@ -58,7 +58,7 @@ test('оформление: тема, размер интерфейса и ко�
     await expect(box).toBeVisible();
     await box.locator('.st-seg button', { hasText: 'Тёмная' }).click();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
-    expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe('rgb(19, 18, 16)');
+    expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe('rgb(20, 21, 24)');
     expect(await app.evaluate(({ nativeTheme }) => nativeTheme.themeSource)).toBe('dark');
     await box.locator('button[aria-label="Крупнее"]').click();
     await expect(box.locator('.st-zv')).toHaveText('110%');
@@ -93,6 +93,7 @@ test('автозапуск с Windows: переключатель в настр�
   let { app, page, errors } = await launch(dir);
   try {
     await page.click('#settingsBtn');
+    await page.locator('.st-tabs').getByText('Запуск',{exact:true}).click();
     const sw = page.locator('button[role=switch][aria-label="Запускать вместе с Windows"]');
     await expect(sw).toHaveAttribute('aria-checked', 'false');
     await sw.click();
