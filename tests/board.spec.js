@@ -250,7 +250,7 @@ test.describe.serial('Доска страницы', () => {
     await page.setInputFiles('.bd-file', fx('fake-video.mp4'));
     await expect(page.locator('.toast')).toContainText('не соответствует расширению');
     await page.setInputFiles('.bd-file', fx('fake-image.jpg'));
-    await expect(page.locator('.toast')).toContainText('повреждён');
+    await expect(page.locator('.toast')).toContainText(/fake-image\.jpg.*повреждён/);
     await page.setInputFiles('.bd-file', fx('empty.png'));
     await expect(page.locator('.toast')).toContainText('пустой');
     await page.waitForTimeout(500);
