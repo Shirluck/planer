@@ -1,6 +1,6 @@
 {
   "name": "planer-desktop",
-  "version": "2.5.0",
+  "version": "2.6.0",
   "description": "Планер — личный планировщик для Windows: календарь задач, доски в стиле Milanote, таймеры для фокусировки и ИИ-ассистент",
   "author": "Shirluck (https://github.com/Shirluck)",
   "license": "MIT",
@@ -46,7 +46,12 @@
     "typescript": "5.9.3"
   },
   "build": {
-    "publish": { "provider": "github", "owner": "Shirluck", "repo": "planer", "releaseType": "release" },
+    "publish": {
+      "provider": "github",
+      "owner": "Shirluck",
+      "repo": "planer",
+      "releaseType": "release"
+    },
     "appId": "local.planer.desktop",
     "productName": "Планер",
     "executableName": "Planer",

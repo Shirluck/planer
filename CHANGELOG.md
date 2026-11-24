@@ -8,6 +8,8 @@
 
 ## [Не выпущено]
 
+## [2.6.0] — 2026-11-24
+
 ### Добавлено
 - Автообновление установленной Windows-версии через GitHub Releases. В настройках можно проверить версию и перезапустить Планер после загрузки.
 - **Заметки как в Notion**: весь документ — одно поле, текст выделяется через любые строки, `Ctrl+A` выделяет всё.
@@ -88,7 +90,8 @@
   медиа-хранилище, редактор зарисовок, ассистент с инструментами для досок.
 - Установщик и portable-версия для Windows, автотесты.
 
-[Не выпущено]: https://github.com/Shirluck/planer/compare/v2.5.0...HEAD
+[Не выпущено]: https://github.com/Shirluck/planer/compare/v2.6.0...HEAD
+[2.6.0]: https://github.com/Shirluck/planer/compare/v2.5.0...v2.6.0
 [2.5.0]: https://github.com/Shirluck/planer/compare/v2.4.0...v2.5.0
 [2.4.0]: https://github.com/Shirluck/planer/compare/v2.3.0...v2.4.0
 [2.3.0]: https://github.com/Shirluck/planer/compare/v2.2.0...v2.3.0
