@@ -104,7 +104,7 @@ if (ea.timers) {
 }
 
 /* ---------- тема и обновление ---------- */
-if (ea.ui) { const apply = s => { document.documentElement.dataset.theme = s.theme; }; ea.ui.onState(apply); ea.ui.get().then(apply); }
+if (ea.ui) { const apply = s => { document.documentElement.dataset.theme = s.theme; document.documentElement.dataset.style = s.style || 'clean'; document.documentElement.style.setProperty('--neon',s.neon || '#29dbc5'); }; ea.ui.onState(apply); ea.ui.get().then(apply); }
 ea.mini.onRefresh(() => { load(); setTimeout(() => $('#mnInput').focus(), 30); });
 load();
 })();

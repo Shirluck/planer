@@ -1,0 +1,44 @@
+/* Палитры используют режим color-scheme из tokens.css, включая системный режим. */
+:root[data-style=clean]{
+  --bg:light-dark(#f3f4f6,#141518);--panel:light-dark(#ffffff,#202125);--panel-2:light-dark(#f7f8fa,#282a30);
+  --text:light-dark(#191b20,#f1f2f5);--muted:light-dark(#575d68,#afb4bf);--faint:light-dark(#717784,#939baa);
+  --line:light-dark(#e0e3e8,#353840);--line-2:light-dark(#cbd0d7,#515660);--hover:light-dark(#edf1f6,#30343c);
+  --shadow:0 2px 5px #10182009,0 12px 32px #10182008;
+}
+[data-style=clean] :is(.col,.sheet,.bd-sheet,.st-box){border-radius:16px;box-shadow:var(--shadow)}
+[data-style=clean] .col-title h2{font-weight:650;letter-spacing:-.025em}
+:root[data-style=neon]{
+  --bg:light-dark(#e9f0f3,#090e15);--panel:light-dark(#f9fdff,#101a24);--panel-2:light-dark(#eef5f8,#172430);
+  --text:light-dark(#112332,#e6f6fc);--muted:light-dark(#445b6a,#a2bccb);--faint:light-dark(#586e7d,#89a4b4);
+  --line:color-mix(in srgb,var(--neon) 26%,light-dark(#c1cbd1,#354452));
+  --line-2:color-mix(in srgb,var(--neon) 43%,light-dark(#83909a,#536675));
+  --hover:color-mix(in srgb,var(--neon) 9%,var(--panel));--shadow:0 0 12px color-mix(in srgb,var(--neon) 15%,transparent);
+}
+[data-style=neon] :is(.col,.sheet,.bd-sheet,.st-box,.mn,.ai,.menu,.bd-card,.column-compose){
+  border:1px solid var(--line-2);border-radius:7px;box-shadow:var(--shadow);
+}
+[data-style=neon] :is(.col-title,.mn-titles,.sheet-top,.st-head){font-family:Consolas,monospace}
+[data-style=neon] :focus-visible{outline:2px solid color-mix(in srgb,var(--neon) 65%,var(--text));outline-offset:2px}
+[data-style=neon] .top{border-bottom:1px solid var(--line);margin-bottom:8px}
+:root[data-style=atelier]{
+  --bg:light-dark(#eae2d3,#26241e);--panel:light-dark(#fff9ea,#322f26);--panel-2:light-dark(#f6edda,#3b372d);
+  --text:light-dark(#30291e,#f4ecdb);--muted:light-dark(#675c48,#c6bba7);--faint:light-dark(#746951,#ac9f87);
+  --line:light-dark(#daceb5,#4a453a);--line-2:light-dark(#b4a58c,#665e50);--hover:light-dark(#efe4cd,#464133);
+  --shadow:2px 3px 0 color-mix(in srgb,var(--line-2) 45%,transparent);
+}
+[data-style=atelier] :is(.col,.sheet,.bd-sheet,.st-box,.bd-card,.column-compose){border-radius:4px;box-shadow:var(--shadow)}
+[data-style=atelier] :is(.col-title h2,.mn-titles b,.title-in,.st-head h2,.brand,.nb[data-t^=h]){
+  font-family:Georgia,serif;letter-spacing:-.02em;
+}
+[data-style=atelier] .col-head{border-bottom:1px solid var(--line)}
+:root[data-style]{--ink:var(--text);--ink-text:var(--panel)}
+.col-title[draggable]{cursor:grab;user-select:none}
+.col-moving{opacity:.65}
+.col-before{outline:2px solid var(--p1);outline-offset:-2px;border-left:4px solid var(--p1)}
+.col-after{outline:2px solid var(--p1);outline-offset:-2px;border-right:4px solid var(--p1)}
+.column-compose{width:min(360px,90vw);padding:20px;border:1px solid var(--line-2);border-radius:14px;background:var(--panel);color:var(--text);box-shadow:var(--shadow)}
+.column-compose::backdrop{background:#10141c66}
+.column-compose h2{font-size:19px;margin:0 0 16px}
+.column-compose input{width:100%;padding:10px;border:1px solid var(--line-2);border-radius:6px;background:var(--panel-2);color:inherit;font:inherit}
+.column-compose footer{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+@media(max-width:1000px){#addColumnBtn .tm-btn-name{display:none}}

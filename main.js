@@ -127,7 +127,7 @@ const ZOOMS = [0.8, 0.9, 1, 1.1, 1.25, 1.4, 1.5];
 function uiState() {
   const s = readSettings();
   const zoom = ZOOMS.includes(s.zoom) ? s.zoom : 1;
-  return { theme: THEMES.includes(s.theme) ? s.theme : 'system', zoom, compact: !!s.compact, dark: nativeTheme.shouldUseDarkColors };
+  return { style: ['clean','neon','atelier'].includes(s.style) ? s.style : 'clean', neon: /^#[a-f0-9]{6}$/i.test(s.neon) ? s.neon : '#29dbc5', theme: THEMES.includes(s.theme) ? s.theme : 'system', zoom, compact: !!s.compact, dark: nativeTheme.shouldUseDarkColors };
 }
 const themeBg = () => nativeTheme.shouldUseDarkColors ? '#131210' : '#f3f1ec';
 function applyUi() {
@@ -140,6 +140,8 @@ function applyUi() {
 /** @param {any} patch */
 function setUi(patch) {
   const p = {};
+  if (patch && ['clean','neon','atelier'].includes(patch.style)) p.style = patch.style;
+  if (patch && typeof patch.neon === 'string' && /^#[a-f0-9]{6}$/i.test(patch.neon)) p.neon = patch.neon;
   if (patch && THEMES.includes(patch.theme)) p.theme = patch.theme;
   if (patch && ZOOMS.includes(patch.zoom)) p.zoom = patch.zoom;
   if (patch && typeof patch.compact === 'boolean') p.compact = patch.compact;

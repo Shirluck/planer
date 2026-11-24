@@ -41,7 +41,7 @@ function initSettings(){
 function applyUiState(s){
   SET.ui = s;
   document.body.classList.toggle('compact', !!s.compact);
-  document.documentElement.dataset.theme = s.theme;
+  document.documentElement.dataset.theme = s.theme; document.documentElement.dataset.style = s.style || 'clean'; document.documentElement.style.setProperty('--neon',s.neon || '#29dbc5');
   paintSettings();
 }
 function setUi(patch){ const ea = window.electronAPI; return ea && ea.ui ? ea.ui.set(patch).then(applyUiState) : Promise.resolve(); }
@@ -74,8 +74,11 @@ function paintSettings(){
   SET.body.replaceChildren(
     h('section', { class:'st-sec' },
       h('h3', {}, 'Оформление'),
-      h('div', { class:'st-row' }, h('span', { class:'st-lab' }, 'Тема'),
-        seg('Тема', [['system', 'Как в системе', 'monitor'], ['light', 'Светлая', 'sun'], ['dark', 'Тёмная', 'moon']], ui.theme, v => setUi({ theme:v }))),
+      h('div', { class:'st-row' }, h('span', {class:'st-lab'}, 'Стиль'),
+        seg('Стиль',[['clean','Clean','monitor'],['neon','Неон','film'],['atelier','Ателье','palette']],ui.style||'clean',v=>setUi({style:v}))),
+      ui.style==='neon' ? h('label',{class:'st-row'},'Цвет подсветки',h('input',{type:'color',value:ui.neon,'aria-label':'Цвет подсветки',onchange:e=>setUi({neon:e.target.value})})) : null,
+      h('div', { class:'st-row' }, h('span', { class:'st-lab' }, 'Яркость'),
+        seg('Режим', [['system', 'Как в системе', 'monitor'], ['light', 'Светлая', 'sun'], ['dark', 'Тёмная', 'moon']], ui.theme, v => setUi({ theme:v }))),
       h('div', { class:'st-row' }, h('span', { class:'st-lab' }, 'Размер интерфейса', h('small', {}, h('kbd', {}, 'Ctrl'), ' + ', h('kbd', {}, '='), ' / ', h('kbd', {}, '−'), ' / ', h('kbd', {}, '0'))),
         h('div', { class:'st-zoom' },
           h('button', { type:'button', class:'tool', 'aria-label':'Мельче', title:'Мельче', 'data-f':'zout', disabled:zi <= 0, onclick:() => setUi({ zoom:ZOOM_STEPS[Math.max(0, zi - 1)] }) }, icon('minus', 16)),
@@ -296,6 +299,14 @@ function paintColumnLayout(){
     folder.children.forEach(n=>renderNode('plans',n,0,col.list));
     board.append(col.root);
   }
+  const all=[...board.querySelectorAll(':scope > .col')];
+  const order=Array.isArray(layoutPrefs.order)?layoutPrefs.order:[];
+  const rank=el=>{const i=order.indexOf(el.dataset.folderColumn||el.dataset.key);return i<0?Infinity:i;};
+  for(const el of all.sort((a,b)=>rank(a)-rank(b))){
+    board.append(el);
+    const handle=el.querySelector('.col-title');
+    if(handle){handle.draggable=true;handle.tabIndex=0;handle.title='Перетащить столбец · Alt + ← / →';}
+  }
   const count=board.querySelectorAll('.col:not([hidden])').length;
   board.style.gridTemplateColumns='repeat('+Math.max(1,count)+',minmax('+ (count>4?'250px':'0') +',1fr))';
 }
@@ -318,11 +329,50 @@ function columnControls(){
         }else{pref.hidden=!pref.hidden;saveColumnLayout();}
       })));
   }
-  const input=h('input',{placeholder:'Название нового столбца','aria-label':'Название нового столбца',maxlength:80,value:SET.columnDraft||'',oninput:e=>SET.columnDraft=e.target.value});
-  section.append(h('form',{class:'st-row',onsubmit:e=>{
-    e.preventDefault();const title=input.value.trim();if(!title){input.focus();return;}
-    S.plans.nodes.push({id:newId(),type:'folder',title,open:true,column:true,children:[]});
-    SET.columnDraft='';touch('plans');refreshTree('plans');paintSettings();
-  }},input,h('button',{type:'submit',class:'tb-btn'},'Добавить столбец')));
   return section;
 }
+
+function openColumnComposer(){
+  const input=h('input',{maxlength:80,required:true,placeholder:'Например, Проекты','aria-label':'Название столбца'});
+  const dialog=h('dialog',{class:'column-compose','aria-label':'Новый столбец'},
+    h('form',{onsubmit:e=>{
+      e.preventDefault();const title=input.value.trim();if(!title){input.focus();return;}
+      const folder={id:newId(),type:'folder',title,open:true,column:true,children:[]};
+      S.plans.nodes.push(folder);touch('plans');refreshTree('plans');dialog.close();
+      board.querySelector('[data-folder-column="'+folder.id+'"]')?.scrollIntoView({block:'nearest',inline:'nearest'});
+    }},h('h2',{},'Новый столбец'),input,h('footer',{},h('button',{class:'tb-btn',type:'button',onclick:()=>dialog.close()},'Отмена'),h('button',{class:'tb-btn primary',type:'submit'},'Добавить'))));
+  document.body.append(dialog);dialog.onclose=()=>{dialog.remove();$('#addColumnBtn').focus();};dialog.showModal();input.focus();
+}
+$('#addColumnBtn').onclick=openColumnComposer;
+(() => {
+  let source=null,target=null;
+  const key=el=>el.dataset.folderColumn||el.dataset.key;
+  const clear=()=>{source?.classList.remove('col-moving');target?.classList.remove('col-before','col-after');source=target=null;};
+  function move(from,to,after){
+    if(!from||!to||from===to)return;
+    board.insertBefore(from,after?to.nextSibling:to);
+    layoutPrefs.order=[...board.children].filter(el=>el.matches('.col')).map(key);
+    localStorage.setItem('planer-column-layout',JSON.stringify(layoutPrefs));
+  }
+  board.addEventListener('dragstart',e=>{
+    const handle=e.target.closest('.col-title');if(!handle)return;
+    source=handle.closest('.col');source.classList.add('col-moving');
+    e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/x-planer-column',key(source));
+  });
+  board.addEventListener('dragover',e=>{
+    if(!source)return;
+    e.preventDefault();target?.classList.remove('col-before','col-after');
+    target=e.target.closest('.col');if(!target||target===source)return;
+    const r=target.getBoundingClientRect();
+    target.classList.add(e.clientX<r.left+r.width/2?'col-before':'col-after');
+    const b=board.getBoundingClientRect();
+    if(e.clientX>b.right-50)board.scrollLeft+=20;else if(e.clientX<b.left+50)board.scrollLeft-=20;
+  });
+  board.addEventListener('drop',e=>{if(!source)return;e.preventDefault();move(source,target,target?.classList.contains('col-after'));clear();});
+  board.addEventListener('dragend',clear);
+  board.addEventListener('keydown',e=>{
+    if(!e.altKey||!e.target.matches('.col-title')||!['ArrowLeft','ArrowRight'].includes(e.code))return;
+    const visible=[...board.querySelectorAll('.col:not([hidden])')],from=e.target.closest('.col'),right=e.code==='ArrowRight';
+    e.preventDefault();move(from,visible[visible.indexOf(from)+(right?1:-1)],right);from.querySelector('.col-title').focus();
+  });
+})();
