@@ -58,7 +58,7 @@
 @media(max-width:1040px){
   #app{min-height:0;width:100%;overflow:hidden}
   #headerMore{display:inline-flex}
-  .top :is(#timerBtn,#toolsBtn,#memoryBtn,#addColumnBtn){display:none}
+  .top :is(#timerBtn,#memoryBtn,#developmentBtn,#addColumnBtn){display:none}
   .top{gap:6px}.top .search-btn{min-width:0}
 }
 .memory-dialog .st-body{overflow:auto;max-height:72vh}

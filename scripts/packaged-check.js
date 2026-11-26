@@ -38,7 +38,7 @@ const ok = m => console.log('✓ ' + m);
   ok('защита exe (fuses): ' + Object.keys(want).join(', '));
   // значки: окно и трей на Windows берут icon.ico — он должен быть внутри app.asar
   const inAsar = require('@electron/asar').listPackage(path.join(SRC, 'resources', 'app.asar')).map(p => p.replace(/\\/g, '/'));
-  for (const f of ['/build/icon.ico', '/build/icon.png', '/lib/updates.js', '/node_modules/electron-updater/package.json', '/mini.html', '/src/motion.js', '/src/app/editor.js']) if (!inAsar.includes(f)) fail('в app.asar нет ' + f);
+  for (const f of ['/build/icon.ico', '/build/icon.png', '/lib/updates.js', '/node_modules/electron-updater/package.json', '/mini.html', '/src/app/memory.js', '/src/app/editor.js']) if (!inAsar.includes(f)) fail('в app.asar нет ' + f);
   ok('в app.asar есть icon.ico, мини-окно, редактор и моушн-инструменты');
 
   // 2–3. настоящий exe запускается; ELECTRON_RUN_AS_NODE игнорируется

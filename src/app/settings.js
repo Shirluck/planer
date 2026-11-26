@@ -265,10 +265,6 @@ async function applyRestored(paths){
       lastSaved[sec] = stable(d);
       refreshSection(sec);
       if (editing && editing.k === sec) editorSync();
-    } else if (k === 'planner-tools' && typeof MT !== 'undefined') {
-      const d = await ea.dbGet(p);
-      MT.links = d && Array.isArray(d.links) ? d.links.map(normLink).filter(Boolean) : DEFAULT_LINKS;
-      if (MT.pop && MT.pop.isConnected) renderToolsTab();
     } else if (k.startsWith('board-') && boardApi && boardApi.forget) {
       const reopen = boardApi.forget(k.slice(6));
       if (reopen && findOwner(k.slice(6))) boardApi.open(k.slice(6));
@@ -347,8 +343,9 @@ $('#addColumnBtn').onclick=openColumnComposer;
 const headerMore=$('#headerMore');
 headerMore.onclick=()=>openMenu(headerMore,[
   {icon:'timer',label:'Таймеры',run:()=>openTimers()},
-  {icon:'film',label:'Моушн',run:()=>openTools()},
   {icon:'bulb',label:'Память',run:()=>$('#memoryBtn').click()},
+  {icon:'globe',label:'Развитие',run:()=>$('#developmentBtn').click()},
+  {icon:'globe',label:'Развитие',run:()=>$('#developmentBtn').click()},
   {icon:'plus',label:'Добавить столбец',run:openColumnComposer}
 ]);
 (() => {

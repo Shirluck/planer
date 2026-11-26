@@ -279,15 +279,8 @@ test.describe.serial('Скриншоты', () => {
     await page.keyboard.type('/');
     await shot('notes-slash-light');
     await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
-    // моушн-инструменты
-    await page.click('#toolsBtn');
-    await page.click('.mt-tab[data-tab=links]');
-    await shot('motion-links-light');
-    await page.click('.mt-tab[data-tab=expr]'); await page.click('.mt-li:has-text("Инерция")');
-    await shot('motion-expr-light');
-    await scheme('dark'); await shot('motion-expr-dark'); await scheme('light');
-    await page.click('.mt-tab[data-tab=time]');
-    await shot('motion-time-light');
+    await page.click('#memoryBtn');
+    await shot('memory-catalog-light');
     await page.keyboard.press('Escape');
     // выделение задач скопом
     const rows = page.locator('.col[data-key=day] .item');

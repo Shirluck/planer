@@ -11,6 +11,7 @@ const { createClaudeCode } = require('./lib/claudecode');
 const { createTimers } = require('./lib/timers');
 const { createBackups } = require('./lib/backups');
 const { fmtClock, fmtDuration } = require('./src/core.js');
+const { fetchDevelopmentFeed } = require('./lib/development');
 
 // Одинаковая папка данных и в режиме разработки, и в собранном приложении:
 //   Windows: %APPDATA%\Planer     macOS: ~/Library/Application Support/Planer     Linux: ~/.config/Planer
@@ -297,6 +298,10 @@ ipcMain.handle('cc:pickPath', async () => {
 
 const docPath = p => { if (!store.validPath(p)) throw new Error('bad path'); return p; };
 ipcMain.handle('db:get', (_e, p) => store.get(docPath(p)));
+ipcMain.handle('development:feed', (event, category) => {
+  if (event.sender !== win?.webContents) throw Error('Недоступно для этого окна');
+  return fetchDevelopmentFeed(category);
+});
 ipcMain.handle('db:set', (_e, p, d) => { store.set(docPath(p), d); return true; });
 ipcMain.handle('db:delete', (_e, p) => { store.remove(docPath(p)); return true; });
 
@@ -440,6 +445,19 @@ function createWindow() {
     icon: appIcon(),
     webPreferences: webPrefs()
   });
+  if (process.platform === 'win32') {
+    const mainWindow = win;
+    mainWindow.webContents.on('before-input-event', (event, input) => {
+      // Windows может забрать Shift при смене раскладки: Electron увидит одиночный Alt.
+      if (input.key === 'Alt') event.preventDefault();
+      if (input.key === 'F10' && !input.shift && !input.control && !input.alt && !input.meta) {
+        event.preventDefault();
+        if (input.type === 'keyDown' && !input.isAutoRepeat) {
+          mainWindow.setMenuBarVisibility(!mainWindow.isMenuBarVisible());
+        }
+      }
+    });
+  }
   win.loadFile(path.join(__dirname, 'index.html'));
   lockNavigation(win, 'index.html');
   win.webContents.on('did-finish-load', () => { if (win) win.webContents.setZoomFactor(uiState().zoom); });
@@ -654,7 +672,6 @@ function buildMenu() {
       { label: 'Таймеры…', click: () => pageCommand('timers') },
       { label: 'Остановить все таймеры', click: () => timers.stopAll() },
       { type: 'separator' },
-      { label: 'Моушн: ссылки, экспрешены, тайминг…', click: () => pageCommand('tools') }
     ] },
     { label: 'Ассистент', submenu: [
       { label: 'Через подписку Claude (Claude Code)', type: 'radio', checked: ai.mode === 'claude-code', click: () => setAi({ mode: 'claude-code' }) },
