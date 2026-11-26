@@ -8,6 +8,8 @@
 
 ## [Не выпущено]
 
+## [2.13.0] — 2026-11-26
+
 - «Развитие» подбирает на день три материала о дизайне, науке и популярных темах и сохраняет их для чтения без сети.
 
 - В разделе «Память» появился каталог из семи игр с результатом текущего раунда. Вкладка «Моушн» убрана.
@@ -129,7 +131,8 @@
   медиа-хранилище, редактор зарисовок, ассистент с инструментами для досок.
 - Установщик и portable-версия для Windows, автотесты.
 
-[Не выпущено]: https://github.com/Shirluck/planer/compare/v2.12.0...HEAD
+[Не выпущено]: https://github.com/Shirluck/planer/compare/v2.13.0...HEAD
+[2.13.0]: https://github.com/Shirluck/planer/compare/v2.12.0...v2.13.0
 [2.12.0]: https://github.com/Shirluck/planer/compare/v2.11.0...v2.12.0
 [2.11.0]: https://github.com/Shirluck/planer/compare/v2.10.0...v2.11.0
 [2.10.0]: https://github.com/Shirluck/planer/compare/v2.9.0...v2.10.0
