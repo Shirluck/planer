@@ -345,7 +345,6 @@ headerMore.onclick=()=>openMenu(headerMore,[
   {icon:'timer',label:'Таймеры',run:()=>openTimers()},
   {icon:'bulb',label:'Память',run:()=>$('#memoryBtn').click()},
   {icon:'globe',label:'Развитие',run:()=>$('#developmentBtn').click()},
-  {icon:'globe',label:'Развитие',run:()=>$('#developmentBtn').click()},
   {icon:'plus',label:'Добавить столбец',run:openColumnComposer}
 ]);
 (() => {

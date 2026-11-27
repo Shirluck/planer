@@ -58,6 +58,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   clipWriteText: t => ipcRenderer.invoke('clip:writeText', t),
   openUrl:  url => ipcRenderer.invoke('app:openUrl', url),
+  developmentCover: url => ipcRenderer.invoke('development:cover', url),
   developmentFeed: category => ipcRenderer.invoke('development:feed', category),
   linkPreview: url => ipcRenderer.invoke('link:preview', url),
   notices:  () => ipcRenderer.invoke('app:notices'),

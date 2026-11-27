@@ -18,40 +18,66 @@
       .replace(/\s+/g, ' ').replace(/\s*Читать (далее|дальше).*$/i, '').trim();
     return text.length > 360 ? text.slice(0, 357).replace(/\s+\S*$/, '') + '…' : text;
   }
-  function selectArticle(xml, used) {
-    if (/<!DOCTYPE/i.test(xml)) return null;
+  function feedEntries(xml, gallery) {
+    if (/<!DOCTYPE/i.test(xml)) return [];
     const doc = new DOMParser().parseFromString(xml, 'application/xml');
-    if (doc.querySelector('parsererror')) return null;
+    if (doc.querySelector('parsererror')) return [];
+    const entries = [];
     for (const item of doc.querySelectorAll('channel > item')) {
       const field = name => item.querySelector(name)?.textContent.trim() || '';
-      const link = field('link').match(/^https:\/\/habr\.com\/(ru\/(?:companies\/[\w-]+\/)?(?:articles|news|blog)\/\d+)\/?(?:\?[^#]*)?$/i);
+      const pattern = gallery ? /^https:\/\/www\.behance\.net\/(gallery\/\d+\/[\w%.-]+)\/?$/i :
+        /^https:\/\/habr\.com\/(ru\/(?:companies\/[\w-]+\/)?(?:articles|news|blog)\/\d+)\/?(?:\?[^#]*)?$/i;
+      const link = field('link').match(pattern);
       if (!link) continue;
-      const url = 'https://habr.com/' + link[1] + '/';
-      const title = field('title').slice(0, 240);
-      const summary = snippet(field('description'));
-      if (title && summary && !used.has(url)) return {url, title, summary};
+      const html = field('description');
+      const image = html.match(/<img\b[^>]*?\ssrc\s*=\s*["']([^"']+)["']/i);
+      const title = field('title').slice(0, 240), summary = snippet(html);
+      if (title && (gallery || summary)) entries.push({
+        title, summary, url:(gallery?'https://www.behance.net/':'https://habr.com/') + link[1] + '/',
+        imageUrl:image?.[1].replace(/&amp;/g,'&') || ''
+      });
     }
-    return null;
+    return entries;
   }
-
+  function picture(card) {
+    if (!/^[a-f0-9]{64}$/.test(card.imageId || '')) return null;
+    const img = h('img', {class:'dev-cover', src:'media://'+card.imageId, loading:'lazy', alt:''});
+    img.onerror=()=>img.remove();
+    return img;
+  }
   let pending = null;
   async function load(day) {
     const history = await api.dbGet(path) || {};
     const cards = {...history[day]};
-    const missing = sections.filter(([key]) => !cards[key]);
-    const used = new Set(Object.values(history).flatMap(row => Object.values(row).map(card => card.url)));
-    const feeds = await Promise.allSettled(missing.map(([key]) => api.developmentFeed(key)));
+    const used = new Set(Object.values(history).flatMap(row => Object.values(row).flat().map(card => card.url)));
+    const sources = sections.map(([key])=>key).reverse().concat('behance');
+    const missing = sources.filter(key=>!cards[key] || (key!=='behance' && cards[key].imageUrl===undefined));
+    const feeds = await Promise.allSettled(missing.map(key=>api.developmentFeed(key)));
     let changed = false;
-    // Даём узкой подборке трендов первый выбор при пересечении рубрик.
-    for (let i = missing.length - 1; i >= 0; i--) {
-      if (feeds[i].status !== 'fulfilled') continue;
-      const article = selectArticle(feeds[i].value, used);
-      if (article) {
-        cards[missing[i][0]] = article;
-        used.add(article.url);
-        changed = true;
+    for (const [i,key] of missing.entries()) {
+      if (feeds[i].status!=='fulfilled') continue;
+      const gallery=key==='behance', entries=feedEntries(feeds[i].value,gallery);
+      if (cards[key]) {
+        const same=entries.find(a=>a.url===cards[key].url);
+        cards[key]={...cards[key],imageUrl:same?.imageUrl || ''};
+      } else {
+        const picks=[];
+        for (const article of entries) {
+          if (used.has(article.url)) continue;
+          picks.push(article);used.add(article.url);
+          if(picks.length===(gallery?3:1))break;
+        }
+        if(!picks.length)continue;
+        cards[key]=gallery?picks:picks[0];
       }
+      changed=true;
     }
+    await Promise.all(Object.values(cards).flat().map(async article=>{
+      if(article.imageUrl && !article.imageId){
+        const id=await api.developmentCover(article.imageUrl).catch(()=>null);
+        if(id){article.imageId=id;changed=true;}
+      }
+    }));
     if (changed) {
       history[day] = cards;
       const keys = Object.keys(history).sort().slice(-90);
@@ -84,6 +110,7 @@
           const article = from && history[from][key];
           const card = h('section', {class:'dev-card'}, h('small', {}, label));
           if (article) {
+            const image=picture(article); if(image)card.append(image);
             card.append(h('h3', {}, article.title), h('p', {}, article.summary));
             if (from !== day) card.append(h('p', {class:'st-note'}, 'Сохранено за '+displayDate(from)));
             card.append(h('button', {type:'button', class:'tb-btn', onclick:()=>api.openUrl(article.url)},
@@ -91,7 +118,18 @@
           } else card.append(h('p', {}, 'Свежий материал пока недоступен.'));
           body.append(card);
         }
-        if (sections.some(([key]) => !today[key])) retry();
+        const galleryDay=today.behance?day:previous.find(k=>history[k].behance);
+        const gallery=h('section',{class:'dev-gallery'},h('h3',{},'Работы с Behance'),h('small',{},'Выбор редакции Behance'));
+        if(galleryDay){
+          if(galleryDay!==day)gallery.append(h('p',{class:'st-note'},'Сохранено за '+displayDate(galleryDay)));
+          const projects=h('div',{class:'dev-projects'});
+          for(const p of history[galleryDay].behance){
+            projects.append(h('button',{type:'button',class:'dev-project',onclick:()=>api.openUrl(p.url)},picture(p),h('strong',{},p.title)));
+          }
+          gallery.append(projects);
+        }else gallery.append(h('p',{},'Подборка работ пока недоступна.'));
+        body.append(gallery);
+        if (!today.behance || sections.some(([key]) => !today[key])) retry();
       } catch {
         if (!dlg.open) return;
         body.replaceChildren(h('p', {role:'status'}, 'Не удалось открыть подборку.'));

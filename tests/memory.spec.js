@@ -15,3 +15,23 @@ test('Память открывает только игры и сохраняе�
     expect(await page.evaluate(()=>extraStore.get('planner-memory'))).toEqual(legacy);
   }finally{await closeApp(app);rmDir(dir);}
 });
+test('Мемори: знакомство, переворот, промах, сбор пар и следующий уровень',async()=>{
+  const dir=tmpDataDir('memory-pairs');const {app,page}=await launch(dir);
+  try{
+    await page.click('#memoryBtn');
+    await page.getByRole('button',{name:/Мемори/}).click();
+    const cards=page.locator('.brain-board button');
+    await expect(cards).toHaveCount(12);
+    const symbols=await cards.locator('.pair-front').allTextContents();
+    await expect(page.locator('[data-face=down]')).toHaveCount(12,{timeout:8000});
+    const other=symbols.findIndex(s=>s!==symbols[0]);
+    await cards.nth(0).click();await cards.nth(other).click();
+    await expect(page.locator('[data-face=down]')).toHaveCount(12);
+    for(const symbol of new Set(symbols)){
+      for(const i of symbols.keys())if(symbols[i]===symbol)await cards.nth(i).click();
+    }
+    await expect(page.locator('.arena-prompt')).toContainText('ошибок: 1');
+    await page.getByText('Следующий уровень').click();
+    await expect(cards).toHaveCount(16);
+  }finally{await closeApp(app);rmDir(dir);}
+});

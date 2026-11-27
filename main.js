@@ -11,7 +11,7 @@ const { createClaudeCode } = require('./lib/claudecode');
 const { createTimers } = require('./lib/timers');
 const { createBackups } = require('./lib/backups');
 const { fmtClock, fmtDuration } = require('./src/core.js');
-const { fetchDevelopmentFeed } = require('./lib/development');
+const { fetchDevelopmentFeed, developmentCover } = require('./lib/development');
 
 // Одинаковая папка данных и в режиме разработки, и в собранном приложении:
 //   Windows: %APPDATA%\Planer     macOS: ~/Library/Application Support/Planer     Linux: ~/.config/Planer
@@ -298,6 +298,7 @@ ipcMain.handle('cc:pickPath', async () => {
 
 const docPath = p => { if (!store.validPath(p)) throw new Error('bad path'); return p; };
 ipcMain.handle('db:get', (_e, p) => store.get(docPath(p)));
+ipcMain.handle('development:cover', (event, url) => event.sender === win?.webContents ? developmentCover(url, media) : null);
 ipcMain.handle('development:feed', (event, category) => {
   if (event.sender !== win?.webContents) throw Error('Недоступно для этого окна');
   return fetchDevelopmentFeed(category);
