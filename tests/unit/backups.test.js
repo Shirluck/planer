@@ -97,3 +97,28 @@ test('копий «вручную» хранится не больше 20', () =
     assert.equal(bk.list().filter(b => b.kind === 'manual').length, 20);
   } finally { done(); }
 });
+
+test('две копии в одну миллисекунду и кратковременная блокировка переименования', t => {
+  const { store, bk, done } = rig();
+  try {
+    store.set(CAL, { text:'первая' });
+    const now = Date.now();
+    t.mock.method(Date, 'now', () => now);
+    const rename = fs.renameSync;
+    let blocked = false;
+    t.mock.method(fs, 'renameSync', (from,to) => {
+      if (!blocked && String(from).endsWith('.partial')) {
+        blocked = true;
+        throw Object.assign(Error('busy'), {code:'EBUSY'});
+      }
+      return rename(from,to);
+    });
+    const first = bk.snapshot('manual');
+    store.set(CAL, { text:'вторая' });
+    const second = bk.snapshot('manual');
+    assert.ok(blocked);
+    assert.notEqual(first.id, second.id);
+    assert.equal(bk.read(first.id, CAL).text, 'первая');
+    assert.equal(bk.read(second.id, CAL).text, 'вторая');
+  } finally { done(); }
+});

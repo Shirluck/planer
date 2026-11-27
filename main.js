@@ -4,7 +4,7 @@
 const { app, BrowserWindow, Menu, Tray, ipcMain, shell, safeStorage, protocol, dialog, clipboard, nativeImage, nativeTheme, Notification, screen, powerMonitor } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const { createStore, writeAtomic } = require('./lib/store');
+const { createStore, writeAtomic, humanFsError } = require('./lib/store');
 const { createMedia, sniff } = require('./lib/media');
 const { createLinkPreview } = require('./lib/linkpreview');
 const { createClaudeCode } = require('./lib/claudecode');
@@ -219,7 +219,9 @@ ipcMain.handle('backup:list', () => backups.list());
 ipcMain.handle('backup:read', (_e, id, p) => { try { return backups.read(id, p); } catch (_) { return null; } });
 ipcMain.handle('backup:restore', (_e, id, paths) => {
   let r;
-  try { r = backups.restore(id, paths); } catch (_) { return { ok: false, error: 'Неверная копия или документ.' }; }
+  try { r = backups.restore(id, paths); } catch (e) {
+    return { ok:false, error:/^bad (backup id|path)$/.test(e.message) ? 'Неверная копия или документ.' : humanFsError(e) };
+  }
   if (r.ok && r.restored.includes(TIMERS_DOC)) timers.reload();
   return r;
 });
