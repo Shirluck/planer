@@ -170,7 +170,25 @@ function sha256(file) { return crypto.createHash('sha256').update(fs.readFileSyn
     'Программа не подписана сертификатом: при первом запуске Windows SmartScreen может предупредить — «Подробнее» → «Выполнить в любом случае». ' +
     'Контрольные суммы — в `SHA256SUMS.txt`. Данные хранятся в `%APPDATA%\\Planer` и при обновлении не теряются.\n');
   step('Релиз ' + tag + ' на GitHub');
-  const rel = sh(gh, ['release', 'create', tag, ...assets, sums, '--repo', repo, '--title', 'Планер ' + version, '--notes-file', notesFile, '--verify-tag', ...(draft ? ['--draft'] : [])], { stdio: ['ignore', 'pipe', 'inherit'] });
-  if (rel.status !== 0) fail('gh release create не удался (тег уже на GitHub — можно повторить: gh release create ' + tag + ' …).');
-  ok('готово: ' + String(rel.stdout).trim() + (draft ? ' (черновик — опубликуйте на GitHub)' : ''));
+  const runGh = (...args) => {
+    const result = sh(gh, args);
+    if (result.status !== 0) throw Error(String(result.stderr || result.error || 'Ошибка GitHub CLI'));
+    return result.stdout.trim();
+  };
+  // Отдельный черновик остаётся доступным, если передача большого EXE прервётся.
+  runGh('release', 'create', tag, '--repo', repo, '--title', 'Планер ' + version, '--notes-file', notesFile, '--verify-tag', '--draft');
+  const files = [...assets, sums];
+  for (const file of files) runGh('release', 'upload', tag, file, '--repo', repo);
+  const remote = JSON.parse(runGh('release', 'view', tag, '--repo', repo, '--json', 'assets,isDraft,url'));
+  for (const file of files) {
+    const asset = remote.assets.find(a => a.name === path.basename(file));
+    if (!asset || asset.state !== 'uploaded' || asset.size !== fs.statSync(file).size || asset.digest !== 'sha256:' + sha256(file)) {
+      fail('не совпадает файл в черновике: ' + path.basename(file));
+    }
+  }
+  if (draft) { ok('черновик: ' + remote.url); return; }
+  runGh('release', 'edit', tag, '--repo', repo, '--draft=false', '--latest');
+  const latest = JSON.parse(runGh('api', 'repos/' + repo + '/releases/latest?check=' + Date.now()));
+  if (latest.tag_name !== tag || latest.draft || latest.prerelease) fail('GitHub ещё не подтвердил последнюю стабильную версию ' + tag);
+  ok('готово: ' + latest.html_url);
 })().catch(e => fail(String((e && e.stack) || e)));
