@@ -8,6 +8,8 @@
 
 ## [Не выпущено]
 
+## [2.13.1] — 2026-11-27
+
 - В настройках оформления названия столбцов, образцы цвета и кнопки выровнены по общей сетке. Длинные названия переносятся внутри своей колонки.
 
 ## [2.13.0] — 2026-11-26
@@ -133,7 +135,8 @@
   медиа-хранилище, редактор зарисовок, ассистент с инструментами для досок.
 - Установщик и portable-версия для Windows, автотесты.
 
-[Не выпущено]: https://github.com/Shirluck/planer/compare/v2.13.0...HEAD
+[Не выпущено]: https://github.com/Shirluck/planer/compare/v2.13.1...HEAD
+[2.13.1]: https://github.com/Shirluck/planer/compare/v2.13.0...v2.13.1
 [2.13.0]: https://github.com/Shirluck/planer/compare/v2.12.0...v2.13.0
 [2.12.0]: https://github.com/Shirluck/planer/compare/v2.11.0...v2.12.0
 [2.11.0]: https://github.com/Shirluck/planer/compare/v2.10.0...v2.11.0
