@@ -307,7 +307,7 @@ function paintColumnLayout(){
   board.style.gridTemplateColumns='repeat('+Math.max(1,count)+',minmax('+ (count>4?'250px':'0') +',1fr))';
 }
 function columnControls(){
-  const section=h('div',{},h('h3',{},'Столбцы'));
+  const section=h('div',{class:'st-columns'},h('h3',{},'Столбцы'));
   const folders=S.plans.nodes.filter(n=>n.column);
   const action=(label,run)=>h('button',{type:'button',class:'tb-btn',onclick:run},label);
   for(const item of [...COLS.map(k=>({id:k,title:SECTIONS[k].title})),...folders]){
@@ -316,7 +316,7 @@ function columnControls(){
     const token=getComputedStyle(document.documentElement).getPropertyValue('--c-'+(item.column?'plans':k)).trim();
     picker.value=pref.color||token;
     picker.onchange=()=>{pref.color=picker.value;saveColumnLayout();};
-    section.append(h('div',{class:'st-row'},h('span',{},item.title),picker,
+    section.append(h('div',{class:'st-column-row'},h('span',{},item.title),picker,
       action('Сброс цвета',()=>{delete pref.color;saveColumnLayout();}),
       action(pref.hidden?'Вернуть':'Убрать',()=>{
         if(item.column){
